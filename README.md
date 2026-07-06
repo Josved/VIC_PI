@@ -4,9 +4,16 @@ Aplicacion movil universitaria para localizar contenedores de reciclaje, consult
 
 ## Estructura
 
-- `frontend/`: app movil React Native con Expo Go y TypeScript.
+- `frontend/`: app movil React Native con Expo Go en JavaScript.
 - `backend/`: API FastAPI con SQLAlchemy, SQLite y JWT.
 - `docs/`: documentacion tecnica y acuerdos para el equipo.
+
+Estructura principal del frontend:
+
+- `App.js`: conecta la navegacion y decide si mostrar login o app principal.
+- `index.js`: arranque de Expo.
+- `Pantallas/`: pantallas visibles de la app.
+- `componentes/`: botones, campos, tema, logo, conexion API y sesion.
 
 ## Inicio rapido
 
@@ -34,7 +41,7 @@ Backend:
 cd backend
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+.\.venv\Scripts\python.exe -m uvicorn app.principal:aplicacion --host 0.0.0.0 --port 8000 --reload
 ```
 
 La API queda por defecto en `http://127.0.0.1:8000`.
@@ -46,4 +53,4 @@ Leer primero [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md).
 
 
 el bueno:
- .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+ .\.venv\Scripts\python.exe -m uvicorn app.principal:aplicacion --reload

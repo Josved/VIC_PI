@@ -13,10 +13,10 @@ VIC es una app movil para que ciudadanos puedan:
 
 ## Stack acordado
 
-- Frontend: React Native, Expo, Expo Go, Expo Web y TypeScript.
+- Frontend: React Native, Expo, Expo Go, Expo Web y JavaScript.
 - Navegacion: React Navigation.
-- Formularios: React Hook Form.
-- Validacion: Zod.
+- Formularios: estados simples con `useState`.
+- Validacion: validaciones basicas en cada pantalla.
 - HTTP: Axios.
 - Sesion local: AsyncStorage.
 - Backend: FastAPI, SQLAlchemy, SQLite, JWT.
@@ -36,7 +36,7 @@ Desde PowerShell:
 
 ```powershell
 cd D:\GITT\VIC_PI\backend
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+.\.venv\Scripts\python.exe -m uvicorn app.principal:aplicacion --host 0.0.0.0 --port 8000 --reload
 ```
 
 Swagger:
@@ -99,13 +99,13 @@ La interfaz usa los colores del logo VIC:
 - Fondo: `#FFFFFF`
 - Texto principal: `#17332A`
 
-La tipografia se mantiene con la familia del sistema para evitar problemas en Expo Go. Si despues se agrega una fuente oficial, debe registrarse una sola vez en `frontend/src/shared/theme/typography.ts`.
+La tipografia se mantiene con la familia del sistema para evitar problemas en Expo Go. Si despues se agrega una fuente oficial, debe registrarse desde `frontend/componentes/tema.js`.
 
 ## Modulos y responsables
 
 ### Modulo 1: Autenticacion
 
-Carpeta principal: `frontend/src/features/auth`
+Carpeta principal: `frontend/Pantallas`
 
 Pantallas incluidas:
 
@@ -116,11 +116,11 @@ Pantallas incluidas:
 
 Endpoints esperados:
 
-- `POST /auth/register`
-- `POST /auth/login`
-- `POST /auth/forgot-password`
-- `POST /auth/reset-password`
-- `GET /auth/me`
+- `POST /autenticacion/registro`
+- `POST /autenticacion/iniciar-sesion`
+- `POST /autenticacion/recuperar-contrasena`
+- `POST /autenticacion/restablecer-contrasena`
+- `GET /autenticacion/mi-usuario`
 
 Estado actual del modulo 1:
 
@@ -128,14 +128,14 @@ Estado actual del modulo 1:
 - Registro funcional contra backend.
 - Seleccion de rol funcional antes de registro.
 - Recuperacion de contrasena funcional como solicitud basica.
-- `forgot-password` muestra confirmacion, pero todavia no envia correo real ni genera token de recuperacion.
+- `recuperar-contrasena` muestra confirmacion, pero todavia no envia correo real ni genera token de recuperacion.
 - Sesion persistida con AsyncStorage.
 - Cerrar sesion disponible desde Perfil.
 - Errores de API visibles en pantalla.
 
 ### Modulo 2: Inicio y comunidad
 
-Carpeta sugerida: `frontend/src/features/community`
+Carpeta principal: `frontend/Pantallas`
 
 Pantallas:
 
@@ -144,9 +144,14 @@ Pantallas:
 - Detalle de dia de recoleccion
 - Anuncios y notificaciones
 
+Estado actual del modulo 2:
+
+- Integrado en `frontend/Pantallas/PantallaInicio.js` con la propuesta de Toño.
+- Incluye bienvenida, anuncios, calendario semanal y detalle de dia en modal.
+
 ### Modulo 3: Contenedores y mapa
 
-Carpeta sugerida: `frontend/src/features/containers`
+Carpeta principal: `frontend/Pantallas`
 
 Pantallas:
 
@@ -155,9 +160,18 @@ Pantallas:
 - Detalle de contenedor
 - Ubicacion/permisos o contenedores cercanos
 
+Estado actual del modulo 3:
+
+- Implementado en `frontend/Pantallas/PantallaContenedores.js`.
+- Incluye mapa visual con pines seleccionables.
+- Incluye lista de contenedores.
+- Incluye detalle del contenedor seleccionado.
+- Incluye estado de ubicacion/permisos y contenedores cercanos.
+- Los datos actuales son locales de ejemplo para documentar y demostrar la interfaz.
+
 ### Modulo 4: Reportes de contenedor
 
-Carpeta sugerida: `frontend/src/features/reports`
+Carpeta principal: `frontend/Pantallas`
 
 Pantallas:
 
@@ -168,9 +182,9 @@ Pantallas:
 
 ## Reglas de trabajo
 
-- No mezclar modulos en la misma carpeta.
-- Compartir solo componentes genericos en `frontend/src/shared`.
-- Mantener colores, espaciados y tipografia desde `frontend/src/shared/theme`.
+- Guardar pantallas visibles en `frontend/Pantallas`.
+- Compartir solo componentes genericos en `frontend/componentes`.
+- Mantener colores y espaciados desde `frontend/componentes/tema.js`.
 - Crear ramas por modulo, por ejemplo `feature/auth`, `feature/community`, `feature/containers`, `feature/reports`.
 - Antes de hacer merge, ejecutar `npm run typecheck` en frontend y probar flujo principal en Expo Go.
 - No subir `.env`, bases SQLite, `.venv`, `node_modules` ni archivos temporales.
@@ -180,36 +194,33 @@ Pantallas:
 
 ## Componentes compartidos
 
-Los componentes reutilizables viven en `frontend/src/shared/components`:
+Los componentes reutilizables viven en `frontend/componentes`:
 
-- `Button`: boton principal/secondary/ghost.
-- `TextField`: input controlado con React Hook Form.
-- `Screen`: layout base con SafeArea y scroll.
-- `VicLogo`: representacion temporal del logo usando iconos y colores VIC.
+- `Boton`: boton principal, secundario o fantasma.
+- `CampoTexto`: entrada de texto simple.
+- `PantallaBase`: layout base con SafeArea y scroll.
+- `LogoVIC`: representacion temporal del logo usando iconos y colores VIC.
+- `ContextoSesion`: guarda usuario, token y funciones de sesion.
 
 Tokens visuales:
 
-- `frontend/src/shared/theme/colors.ts`
-- `frontend/src/shared/theme/spacing.ts`
-- `frontend/src/shared/theme/typography.ts`
+- `frontend/componentes/tema.js`
 
 API compartida:
 
-- `frontend/src/shared/api/http.ts`: instancia Axios.
-- `frontend/src/shared/api/errors.ts`: normalizacion de errores visibles.
-- `frontend/src/shared/config/env.ts`: lectura de `EXPO_PUBLIC_API_URL`.
+- `frontend/componentes/conexionApi.js`: instancia Axios, lectura de `EXPO_PUBLIC_API_URL` y normalizacion de errores visibles.
 
 ## Backend actual
 
 Carpeta principal: `backend/app`
 
-- `main.py`: crea la app, CORS, routers y tablas.
-- `auth.py`: endpoints de autenticacion.
-- `models.py`: modelo SQLAlchemy `Usuario`.
-- `schemas.py`: esquemas Pydantic.
-- `security.py`: hash de password y JWT.
-- `database.py`: engine SQLite y sesiones.
-- `config.py`: configuracion basica.
+- `principal.py`: crea la aplicacion, CORS, rutas y tablas.
+- `autenticacion.py`: endpoints de autenticacion.
+- `modelos.py`: modelo SQLAlchemy `Usuario`.
+- `esquemas.py`: esquemas Pydantic.
+- `seguridad.py`: hash de contrasena y JWT.
+- `base_datos.py`: motor SQLite y sesiones.
+- `configuracion.py`: configuracion basica.
 
 Dependencias importantes:
 
@@ -224,7 +235,9 @@ La base local `backend/vic.db` se genera automaticamente y NO debe subirse a Git
 - Frontend Expo creado.
 - Navegacion principal y autenticacion listas.
 - Backend FastAPI base agregado con endpoints de autenticacion.
-- Pantallas placeholder agregadas para modulos 2, 3 y 4.
+- Modulo 2 integrado en `frontend/Pantallas/PantallaInicio.js`.
+- Modulo 3 implementado en `frontend/Pantallas/PantallaContenedores.js`.
+- Modulo 4 sigue como pantalla base.
 - Frontend y backend probados en web.
 - `npm run typecheck` pasa correctamente.
 
@@ -243,7 +256,7 @@ Se valido:
 
 ## Pendientes conocidos
 
-- Reemplazar `VicLogo` temporal por el archivo oficial del logo si el equipo entrega el PNG/SVG.
+- Reemplazar `LogoVIC` temporal por el archivo oficial del logo si el equipo entrega el PNG/SVG.
 - Implementar recuperacion real de contrasena con token, expiracion y envio de correo si el alcance lo exige.
 - Probar en Expo Go fisico antes de entrega final, sobre todo si despues se agregan camara, QR, ubicacion o mapa.
 - Agregar pruebas automatizadas si el profesor/equipo las solicita.
