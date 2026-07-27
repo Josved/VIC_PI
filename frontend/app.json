@@ -20,6 +20,14 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "VIC necesita la camara para escanear el codigo QR de los contenedores."
+        }
+      ]
+    ]
   }
 }

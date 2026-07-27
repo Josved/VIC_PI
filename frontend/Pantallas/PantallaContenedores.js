@@ -1,66 +1,92 @@
 import { useMemo, useState } from 'react';
-import { LocateFixed, Lock, MapPinned, Navigation, Recycle, Route, Trash2 } from 'lucide-react-native';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { LocateFixed, Lock, MapPinned, Navigation, Recycle, Trash2 } from 'lucide-react-native';
 
 import { Boton } from '../componentes/Boton';
 import { PantallaBase } from '../componentes/PantallaBase';
+import { usarContenedores } from '../componentes/usarContenedores';
 import { colores, espaciado } from '../componentes/tema';
 
-const contenedores = [
-  {
-    id: 'c1',
-    nombre: 'Contenedor A1',
-    zona: 'Entrada principal',
-    tipo: 'Reciclaje',
-    estado: 'Disponible',
-    llenado: 35,
-    distancia: '120 m',
-    serie: 'VIC-A1-001',
-    horario: '08:00 AM - 06:00 PM',
-    ubicacion: { arriba: '23%', izquierda: '18%' },
-  },
-  {
-    id: 'c2',
-    nombre: 'Contenedor B2',
-    zona: 'Cafeteria',
-    tipo: 'Organico',
-    estado: 'Casi lleno',
-    llenado: 82,
-    distancia: '260 m',
-    serie: 'VIC-B2-014',
-    horario: '07:00 AM - 05:00 PM',
-    ubicacion: { arriba: '48%', izquierda: '64%' },
-  },
-  {
-    id: 'c3',
-    nombre: 'Contenedor C3',
-    zona: 'Biblioteca',
-    tipo: 'Inorganico',
-    estado: 'Mantenimiento',
-    llenado: 15,
-    distancia: '410 m',
-    serie: 'VIC-C3-021',
-    horario: '09:00 AM - 04:00 PM',
-    ubicacion: { arriba: '68%', izquierda: '34%' },
-  },
-];
-
 const colorEstado = {
-  Disponible: colores.primary,
-  'Casi lleno': colores.secondary,
-  Mantenimiento: colores.danger,
+  disponible: colores.primary,
+  casi_lleno: colores.secondary,
+  mantenimiento: colores.danger,
 };
 
+const etiquetaEstado = {
+  disponible: 'Disponible',
+  casi_lleno: 'Casi lleno',
+  mantenimiento: 'Mantenimiento',
+};
+
+const etiquetaTipo = {
+  reciclaje: 'Reciclaje',
+  organico: 'Organico',
+  inorganico: 'Inorganico',
+};
+
+// Posiciona los pines dentro del recuadro segun su lat/lng real, normalizado al rango del
+// propio conjunto de contenedores. Es una vista aproximada mientras no se integra un mapa real
+// (ej. react-native-maps); no representa una proyeccion geografica exacta.
+function calcularPosicionesPines(contenedores) {
+  if (contenedores.length === 0) {
+    return {};
+  }
+
+  const latitudes = contenedores.map((contenedor) => contenedor.latitud);
+  const longitudes = contenedores.map((contenedor) => contenedor.longitud);
+  const minLat = Math.min(...latitudes);
+  const maxLat = Math.max(...latitudes);
+  const minLng = Math.min(...longitudes);
+  const maxLng = Math.max(...longitudes);
+  const rangoLat = maxLat - minLat || 1;
+  const rangoLng = maxLng - minLng || 1;
+
+  const posiciones = {};
+  contenedores.forEach((contenedor) => {
+    const proporcionLat = (contenedor.latitud - minLat) / rangoLat;
+    const proporcionLng = (contenedor.longitud - minLng) / rangoLng;
+    posiciones[contenedor.id] = {
+      arriba: `${10 + proporcionLat * 70}%`,
+      izquierda: `${10 + proporcionLng * 70}%`,
+    };
+  });
+
+  return posiciones;
+}
+
 export function PantallaContenedores() {
-  const [idSeleccionado, cambiarSeleccionado] = useState(contenedores[0].id);
+  const { contenedores, cargando, error, recargar } = usarContenedores();
+  const [idSeleccionado, cambiarSeleccionado] = useState(null);
   const [permisoUbicacion, cambiarPermisoUbicacion] = useState(false);
 
-  const contenedorSeleccionado = useMemo(
-    () => contenedores.find((contenedor) => contenedor.id === idSeleccionado) || contenedores[0],
-    [idSeleccionado],
-  );
+  const posicionesPines = useMemo(() => calcularPosicionesPines(contenedores), [contenedores]);
 
-  const contenedoresCercanos = permisoUbicacion ? contenedores : contenedores.slice(0, 2);
+  const contenedorSeleccionado = useMemo(() => {
+    if (contenedores.length === 0) {
+      return null;
+    }
+    return contenedores.find((contenedor) => contenedor.id === idSeleccionado) || contenedores[0];
+  }, [contenedores, idSeleccionado]);
+
+  const otrosContenedores = permisoUbicacion ? contenedores : contenedores.slice(0, 2);
+
+  if (cargando) {
+    return (
+      <PantallaBase>
+        <ActivityIndicator color={colores.primary} size="large" />
+      </PantallaBase>
+    );
+  }
+
+  if (error) {
+    return (
+      <PantallaBase>
+        <Text style={estilos.error}>{error}</Text>
+        <Boton texto="Reintentar" alPresionar={recargar} />
+      </PantallaBase>
+    );
+  }
 
   return (
     <PantallaBase centrada={false}>
@@ -68,121 +94,132 @@ export function PantallaContenedores() {
         <MapPinned color={colores.primary} size={42} />
         <View style={estilos.textoEncabezado}>
           <Text style={estilos.titulo}>Contenedores y mapa</Text>
-          <Text style={estilos.subtitulo}>Consulta ubicaciones, detalles y contenedores cercanos.</Text>
+          <Text style={estilos.subtitulo}>Consulta ubicaciones, detalles y otros contenedores.</Text>
         </View>
       </View>
 
-      <View style={estilos.mapa}>
-        <Text style={estilos.tituloMapa}>Mapa de contenedores</Text>
-        <View style={estilos.rutaHorizontal} />
-        <View style={estilos.rutaVertical} />
-        {contenedores.map((contenedor) => {
-          const seleccionado = contenedor.id === contenedorSeleccionado.id;
-          return (
-            <Pressable
-              accessibilityRole="button"
-              key={contenedor.id}
-              onPress={() => cambiarSeleccionado(contenedor.id)}
-              style={[
-                estilos.pinMapa,
-                {
-                  top: contenedor.ubicacion.arriba,
-                  left: contenedor.ubicacion.izquierda,
-                  backgroundColor: colorEstado[contenedor.estado],
-                },
-                seleccionado && estilos.pinSeleccionado,
-              ]}
-            >
-              <Trash2 color={colores.white} size={18} />
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <View style={estilos.permiso}>
-        <View style={estilos.iconoPermiso}>
-          {permisoUbicacion ? <LocateFixed color={colores.primary} size={24} /> : <Lock color={colores.secondary} size={24} />}
-        </View>
-        <View style={estilos.textoPermiso}>
-          <Text style={estilos.tituloPermiso}>
-            {permisoUbicacion ? 'Ubicacion activada' : 'Ubicacion pendiente'}
-          </Text>
-          <Text style={estilos.descripcionPermiso}>
-            {permisoUbicacion
-              ? 'Mostrando contenedores cercanos segun tu posicion.'
-              : 'Activa la ubicacion para ordenar los contenedores cercanos.'}
-          </Text>
-        </View>
-        <Boton
-          texto={permisoUbicacion ? 'Activa' : 'Activar'}
-          variante={permisoUbicacion ? 'fantasma' : 'secundario'}
-          alPresionar={() => cambiarPermisoUbicacion(true)}
-        />
-      </View>
-
-      <Text style={estilos.tituloSeccion}>Lista de contenedores</Text>
-      <View style={estilos.lista}>
-        {contenedores.map((contenedor) => {
-          const seleccionado = contenedor.id === contenedorSeleccionado.id;
-          return (
-            <Pressable
-              accessibilityRole="button"
-              key={contenedor.id}
-              onPress={() => cambiarSeleccionado(contenedor.id)}
-              style={[estilos.tarjetaLista, seleccionado && estilos.tarjetaListaSeleccionada]}
-            >
-              <View style={[estilos.puntoEstado, { backgroundColor: colorEstado[contenedor.estado] }]} />
-              <View style={estilos.infoLista}>
-                <Text style={estilos.nombreContenedor}>{contenedor.nombre}</Text>
-                <Text style={estilos.zonaContenedor}>{contenedor.zona}</Text>
-              </View>
-              <Text style={estilos.distancia}>{contenedor.distancia}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <Text style={estilos.tituloSeccion}>Detalle de contenedor</Text>
-      <View style={estilos.detalle}>
-        <View style={estilos.detalleEncabezado}>
-          <View style={[estilos.iconoDetalle, { backgroundColor: colorEstado[contenedorSeleccionado.estado] }]}>
-            <Recycle color={colores.white} size={26} />
+      {contenedores.length === 0 ? (
+        <Text style={estilos.vacio}>Todavia no hay contenedores registrados.</Text>
+      ) : (
+        <>
+          <View style={estilos.mapa}>
+            <Text style={estilos.tituloMapa}>Vista aproximada</Text>
+            {contenedores.map((contenedor) => {
+              const seleccionado = contenedor.id === contenedorSeleccionado.id;
+              const posicion = posicionesPines[contenedor.id];
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  key={contenedor.id}
+                  onPress={() => cambiarSeleccionado(contenedor.id)}
+                  style={[
+                    estilos.pinMapa,
+                    {
+                      top: posicion.arriba,
+                      left: posicion.izquierda,
+                      backgroundColor: colorEstado[contenedor.estado],
+                    },
+                    seleccionado && estilos.pinSeleccionado,
+                  ]}
+                >
+                  <Trash2 color={colores.white} size={18} />
+                </Pressable>
+              );
+            })}
           </View>
-          <View style={estilos.detalleTitulo}>
-            <Text style={estilos.nombreDetalle}>{contenedorSeleccionado.nombre}</Text>
-            <Text style={estilos.textoDetalle}>{contenedorSeleccionado.zona}</Text>
-          </View>
-        </View>
 
-        <View style={estilos.barraLlenado}>
-          <View style={[estilos.progresoLlenado, { width: `${contenedorSeleccionado.llenado}%`, backgroundColor: colorEstado[contenedorSeleccionado.estado] }]} />
-        </View>
-        <Text style={estilos.porcentaje}>{contenedorSeleccionado.llenado}% de capacidad</Text>
-
-        <FilaDetalle etiqueta="Estado" valor={contenedorSeleccionado.estado} />
-        <FilaDetalle etiqueta="Tipo" valor={contenedorSeleccionado.tipo} />
-        <FilaDetalle etiqueta="Numero de serie" valor={contenedorSeleccionado.serie} />
-        <FilaDetalle etiqueta="Horario" valor={contenedorSeleccionado.horario} />
-      </View>
-
-      <Text style={estilos.tituloSeccion}>Contenedores cercanos</Text>
-      <View style={estilos.cercanos}>
-        {contenedoresCercanos.map((contenedor) => (
-          <View key={contenedor.id} style={estilos.cercano}>
-            <Navigation color={colorEstado[contenedor.estado]} size={20} />
-            <View style={estilos.infoCercano}>
-              <Text style={estilos.nombreCercano}>{contenedor.nombre}</Text>
-              <Text style={estilos.textoCercano}>{contenedor.zona}</Text>
+          <View style={estilos.permiso}>
+            <View style={estilos.iconoPermiso}>
+              {permisoUbicacion ? <LocateFixed color={colores.primary} size={24} /> : <Lock color={colores.secondary} size={24} />}
             </View>
-            <Text style={estilos.distancia}>{contenedor.distancia}</Text>
+            <View style={estilos.textoPermiso}>
+              <Text style={estilos.tituloPermiso}>
+                {permisoUbicacion ? 'Ubicacion activada' : 'Ubicacion pendiente'}
+              </Text>
+              <Text style={estilos.descripcionPermiso}>
+                {permisoUbicacion
+                  ? 'Mostrando todos los contenedores disponibles.'
+                  : 'Activa la ubicacion para ver el resto de los contenedores.'}
+              </Text>
+            </View>
+            <Boton
+              texto={permisoUbicacion ? 'Activa' : 'Activar'}
+              variante={permisoUbicacion ? 'fantasma' : 'secundario'}
+              alPresionar={() => cambiarPermisoUbicacion(true)}
+            />
           </View>
-        ))}
-      </View>
 
-      <View style={estilos.ruta}>
-        <Route color={colores.primary} size={22} />
-        <Text style={estilos.textoRuta}>Selecciona un contenedor en el mapa o en la lista para ver su detalle.</Text>
-      </View>
+          <Text style={estilos.tituloSeccion}>Lista de contenedores</Text>
+          <View style={estilos.lista}>
+            {contenedores.map((contenedor) => {
+              const seleccionado = contenedor.id === contenedorSeleccionado.id;
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  key={contenedor.id}
+                  onPress={() => cambiarSeleccionado(contenedor.id)}
+                  style={[estilos.tarjetaLista, seleccionado && estilos.tarjetaListaSeleccionada]}
+                >
+                  <View style={[estilos.puntoEstado, { backgroundColor: colorEstado[contenedor.estado] }]} />
+                  <View style={estilos.infoLista}>
+                    <Text style={estilos.nombreContenedor}>{contenedor.nombre}</Text>
+                    <Text style={estilos.zonaContenedor}>{contenedor.zona}</Text>
+                  </View>
+                  <Text style={estilos.llenado}>{contenedor.porcentaje_llenado}%</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Text style={estilos.tituloSeccion}>Detalle de contenedor</Text>
+          <View style={estilos.detalle}>
+            <View style={estilos.detalleEncabezado}>
+              <View style={[estilos.iconoDetalle, { backgroundColor: colorEstado[contenedorSeleccionado.estado] }]}>
+                <Recycle color={colores.white} size={26} />
+              </View>
+              <View style={estilos.detalleTitulo}>
+                <Text style={estilos.nombreDetalle}>{contenedorSeleccionado.nombre}</Text>
+                <Text style={estilos.textoDetalle}>{contenedorSeleccionado.zona}</Text>
+              </View>
+            </View>
+
+            <View style={estilos.barraLlenado}>
+              <View
+                style={[
+                  estilos.progresoLlenado,
+                  {
+                    width: `${contenedorSeleccionado.porcentaje_llenado}%`,
+                    backgroundColor: colorEstado[contenedorSeleccionado.estado],
+                  },
+                ]}
+              />
+            </View>
+            <Text style={estilos.porcentaje}>{contenedorSeleccionado.porcentaje_llenado}% de capacidad</Text>
+
+            <FilaDetalle etiqueta="Estado" valor={etiquetaEstado[contenedorSeleccionado.estado]} />
+            <FilaDetalle etiqueta="Tipo" valor={etiquetaTipo[contenedorSeleccionado.tipo]} />
+            <FilaDetalle etiqueta="Numero de serie" valor={contenedorSeleccionado.serie} />
+            <FilaDetalle
+              etiqueta="Coordenadas"
+              valor={`${contenedorSeleccionado.latitud.toFixed(5)}, ${contenedorSeleccionado.longitud.toFixed(5)}`}
+            />
+          </View>
+
+          <Text style={estilos.tituloSeccion}>Otros contenedores</Text>
+          <View style={estilos.cercanos}>
+            {otrosContenedores.map((contenedor) => (
+              <View key={contenedor.id} style={estilos.cercano}>
+                <Navigation color={colorEstado[contenedor.estado]} size={20} />
+                <View style={estilos.infoCercano}>
+                  <Text style={estilos.nombreCercano}>{contenedor.nombre}</Text>
+                  <Text style={estilos.textoCercano}>{contenedor.zona}</Text>
+                </View>
+                <Text style={estilos.llenado}>{contenedor.porcentaje_llenado}%</Text>
+              </View>
+            ))}
+          </View>
+        </>
+      )}
     </PantallaBase>
   );
 }
@@ -216,6 +253,18 @@ const estilos = StyleSheet.create({
     fontSize: 15,
     lineHeight: 21,
   },
+  error: {
+    color: colores.danger,
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: espaciado.md,
+    textAlign: 'center',
+  },
+  vacio: {
+    color: colores.muted,
+    fontSize: 15,
+    textAlign: 'center',
+  },
   mapa: {
     height: 230,
     overflow: 'hidden',
@@ -230,22 +279,6 @@ const estilos = StyleSheet.create({
     color: colores.text,
     fontSize: 16,
     fontWeight: '900',
-  },
-  rutaHorizontal: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: '54%',
-    height: 18,
-    backgroundColor: '#D7E5DC',
-  },
-  rutaVertical: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: '42%',
-    width: 18,
-    backgroundColor: '#D7E5DC',
   },
   pinMapa: {
     position: 'absolute',
@@ -334,7 +367,7 @@ const estilos = StyleSheet.create({
     color: colores.muted,
     fontSize: 13,
   },
-  distancia: {
+  llenado: {
     color: colores.primary,
     fontSize: 13,
     fontWeight: '900',
@@ -432,19 +465,5 @@ const estilos = StyleSheet.create({
   textoCercano: {
     color: colores.muted,
     fontSize: 13,
-  },
-  ruta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: espaciado.sm,
-    padding: espaciado.md,
-    borderRadius: 14,
-    backgroundColor: colores.surface,
-  },
-  textoRuta: {
-    flex: 1,
-    color: colores.muted,
-    fontSize: 13,
-    lineHeight: 18,
   },
 });

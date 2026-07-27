@@ -52,7 +52,7 @@ def registrar_usuario(datos: RegistroEntrada, base_datos: Session = Depends(obte
         apellidos=datos.apellidos.strip(),
         correo=datos.correo.lower(),
         contrasena_hash=cifrar_contrasena(datos.contrasena),
-        rol=datos.rol,
+        rol="citizen",
     )
     base_datos.add(usuario)
     base_datos.commit()

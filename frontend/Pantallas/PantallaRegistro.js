@@ -8,8 +8,16 @@ import { obtenerMensajeErrorApi } from '../componentes/conexionApi';
 import { usarSesion } from '../componentes/ContextoSesion';
 import { colores, espaciado } from '../componentes/tema';
 
+const LARGO_MAXIMO_NOMBRE = 50;
+// Letras (con acentos y ñ), espacios, guion y apostrofe. Sin numeros ni simbolos como %&!/").
+const PATRON_NOMBRE = /^[A-Za-zÁÉÍÓÚÑÜáéíóúñü]+(?:[ '-][A-Za-zÁÉÍÓÚÑÜáéíóúñü]+)*$/;
+
+function validarNombre(valor) {
+  return valor.trim().length >= 2 && valor.length <= LARGO_MAXIMO_NOMBRE && PATRON_NOMBRE.test(valor.trim());
+}
+
 export function PantallaRegistro({ navigation }) {
-  const { registrarCuenta, rolSeleccionado } = usarSesion();
+  const { registrarCuenta } = usarSesion();
   const [formulario, setFormulario] = useState({ nombre: '', apellidos: '', correo: '', contrasena: '' });
   const [cargando, setCargando] = useState(false);
   const [errorFormulario, setErrorFormulario] = useState('');
@@ -19,8 +27,18 @@ export function PantallaRegistro({ navigation }) {
   }
 
   async function crearCuenta() {
-    if (!formulario.nombre || !formulario.apellidos || !formulario.correo || formulario.contrasena.length < 6) {
-      setErrorFormulario('Completa todos los campos. La contrasena debe tener al menos 6 caracteres.');
+    if (!validarNombre(formulario.nombre) || !validarNombre(formulario.apellidos)) {
+      setErrorFormulario('Nombre y apellidos solo admiten letras y espacios (2 a 50 caracteres).');
+      return;
+    }
+
+    if (!formulario.correo) {
+      setErrorFormulario('Escribe tu correo.');
+      return;
+    }
+
+    if (formulario.contrasena.length < 6) {
+      setErrorFormulario('La contrasena debe tener al menos 6 caracteres.');
       return;
     }
 
@@ -44,14 +62,14 @@ export function PantallaRegistro({ navigation }) {
     <PantallaBase>
       <View style={estilos.encabezado}>
         <Text style={estilos.titulo}>Crear cuenta</Text>
-        <Text style={estilos.subtitulo}>Rol seleccionado: {rolSeleccionado}</Text>
+        <Text style={estilos.subtitulo}>Tu cuenta se crea como ciudadano.</Text>
       </View>
 
       <View style={estilos.formulario}>
-        <CampoTexto etiqueta="Nombre" value={formulario.nombre} onChangeText={(valor) => cambiarCampo('nombre', valor)} />
-        <CampoTexto etiqueta="Apellidos" value={formulario.apellidos} onChangeText={(valor) => cambiarCampo('apellidos', valor)} />
+        <CampoTexto etiqueta="Nombre" value={formulario.nombre} onChangeText={(valor) => cambiarCampo('nombre', valor)} maxLength={LARGO_MAXIMO_NOMBRE} />
+        <CampoTexto etiqueta="Apellidos" value={formulario.apellidos} onChangeText={(valor) => cambiarCampo('apellidos', valor)} maxLength={LARGO_MAXIMO_NOMBRE} />
         <CampoTexto etiqueta="Correo" value={formulario.correo} onChangeText={(valor) => cambiarCampo('correo', valor)} autoCapitalize="none" keyboardType="email-address" />
-        <CampoTexto etiqueta="Contrasena" value={formulario.contrasena} onChangeText={(valor) => cambiarCampo('contrasena', valor)} secureTextEntry />
+        <CampoTexto etiqueta="Contrasena" value={formulario.contrasena} onChangeText={(valor) => cambiarCampo('contrasena', valor)} secureTextEntry maxLength={72} />
         {errorFormulario ? <Text style={estilos.errorFormulario}>{errorFormulario}</Text> : null}
         <Boton texto="Registrarme" alPresionar={crearCuenta} cargando={cargando} />
         <Boton texto="Volver" variante="fantasma" alPresionar={() => navigation.goBack()} />

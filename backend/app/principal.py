@@ -4,6 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import modelos
 from .autenticacion import enrutador as enrutador_autenticacion
 from .base_datos import Base, motor_base_datos
+from .contenedores import enrutador as enrutador_contenedores
+from .reportes import enrutador as enrutador_reportes
 
 Base.metadata.create_all(bind=motor_base_datos)
 
@@ -18,6 +20,8 @@ aplicacion.add_middleware(
 )
 
 aplicacion.include_router(enrutador_autenticacion)
+aplicacion.include_router(enrutador_contenedores)
+aplicacion.include_router(enrutador_reportes)
 
 
 @aplicacion.get("/")

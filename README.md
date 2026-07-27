@@ -52,5 +52,6 @@ Leer primero [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md).
 
 
 
-el bueno:
- .\.venv\Scripts\python.exe -m uvicorn app.principal:aplicacion --reload
+Nota: si usas `--reload` sin `--host 0.0.0.0`, uvicorn solo escucha en `127.0.0.1` y el celular
+no podra conectarse aunque el backend este corriendo. Usa siempre el comando completo de arriba
+(con `--host 0.0.0.0 --port 8000`) cuando vayas a probar desde Expo Go.

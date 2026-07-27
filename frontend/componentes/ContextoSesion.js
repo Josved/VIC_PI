@@ -10,7 +10,6 @@ const ContextoSesion = createContext(null);
 export function ProveedorSesion({ children }) {
   const [sesion, cambiarSesion] = useState(null);
   const [cargando, cambiarCargando] = useState(true);
-  const [rolSeleccionado, cambiarRolSeleccionado] = useState('citizen');
 
   useEffect(() => {
     async function cargarSesionGuardada() {
@@ -41,10 +40,7 @@ export function ProveedorSesion({ children }) {
   }
 
   async function registrarCuenta(datos) {
-    const respuesta = await conexionApi.post('/autenticacion/registro', {
-      ...datos,
-      rol: rolSeleccionado,
-    });
+    const respuesta = await conexionApi.post('/autenticacion/registro', datos);
     await guardarSesion(respuesta.data);
   }
 
@@ -63,14 +59,12 @@ export function ProveedorSesion({ children }) {
       usuario: sesion?.usuario || null,
       token: sesion?.token_acceso || null,
       cargando,
-      rolSeleccionado,
-      cambiarRolSeleccionado,
       iniciarSesion,
       registrarCuenta,
       pedirRecuperacionContrasena,
       cerrarSesion,
     }),
-    [cargando, rolSeleccionado, sesion],
+    [cargando, sesion],
   );
 
   return <ContextoSesion.Provider value={datosSesion}>{children}</ContextoSesion.Provider>;
