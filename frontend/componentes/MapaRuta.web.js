@@ -25,13 +25,21 @@ export function MapaRuta({
 }) {
   const contenedor = useRef(null);
   const mapa = useRef(null);
+  const capaDatos = useRef(null);
+  const agregarPunto = useRef(alAgregarPunto);
+  const eliminarPunto = useRef(alEliminarPunto);
+
+  useEffect(() => {
+    agregarPunto.current = alAgregarPunto;
+  }, [alAgregarPunto]);
+
+  useEffect(() => {
+    eliminarPunto.current = alEliminarPunto;
+  }, [alEliminarPunto]);
 
   useEffect(() => {
     if (!contenedor.current) {
       return undefined;
-    }
-    if (mapa.current) {
-      mapa.current.remove();
     }
     const instancia = L.map(contenedor.current, {
       zoomControl: true,
@@ -42,7 +50,33 @@ export function MapaRuta({
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap',
     }).addTo(instancia);
+    capaDatos.current = L.layerGroup().addTo(instancia);
 
+    const manejarClic = (evento) => {
+      agregarPunto.current?.({
+        latitude: evento.latlng.lat,
+        longitude: evento.latlng.lng,
+      });
+    };
+    instancia.on('click', manejarClic);
+    const temporizador = setTimeout(() => instancia.invalidateSize(), 50);
+
+    return () => {
+      clearTimeout(temporizador);
+      instancia.off('click', manejarClic);
+      capaDatos.current = null;
+      mapa.current = null;
+      instancia.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    const instancia = mapa.current;
+    const capa = capaDatos.current;
+    if (!instancia || !capa) {
+      return;
+    }
+    capa.clearLayers();
     const puntosVisibles = puntos.length > 0 ? puntos : paradas;
     const coordenadasRuta = (geometria.length > 0 ? geometria : puntosVisibles).map(
       (punto) => [punto.latitud, punto.longitud],
@@ -52,7 +86,7 @@ export function MapaRuta({
         color: colores.primary,
         weight: 5,
         opacity: 0.9,
-      }).addTo(instancia);
+      }).addTo(capa);
     }
     puntosVisibles.forEach((punto, indice) => {
       const esPaso = punto.tipo === 'paso';
@@ -66,14 +100,14 @@ export function MapaRuta({
       const marcador = L.marker([punto.latitud, punto.longitud], {
         icon: icono(`${indice + 1}`, color),
       })
-        .addTo(instancia)
+        .addTo(capa)
         .bindPopup(
           punto.direccion
           || punto.codigo_qr
           || (esPaso ? 'Punto de paso. Pulsa para eliminar.' : 'Parada'),
         );
-      if (esPaso && alEliminarPunto) {
-        marcador.on('click', () => alEliminarPunto(indice));
+      if (esPaso && eliminarPunto.current) {
+        marcador.on('click', () => eliminarPunto.current?.(indice));
       }
     });
     if (ubicacionRecolector) {
@@ -81,7 +115,7 @@ export function MapaRuta({
         [ubicacionRecolector.latitude, ubicacionRecolector.longitude],
         { icon: icono('C', '#2196F3') },
       )
-        .addTo(instancia)
+        .addTo(capa)
         .bindPopup('Recolector en recorrido');
     }
 
@@ -94,24 +128,10 @@ export function MapaRuta({
     if (limites.length > 0) {
       instancia.fitBounds(limites, { padding: [32, 32], maxZoom: 17 });
     }
-    if (alAgregarPunto) {
-      instancia.on('click', (evento) =>
-        alAgregarPunto({
-          latitude: evento.latlng.lat,
-          longitude: evento.latlng.lng,
-        }),
-      );
-    }
-    setTimeout(() => instancia.invalidateSize(), 50);
-
-    return () => {
-      instancia.remove();
-      mapa.current = null;
-    };
   }, [
-    JSON.stringify(paradas),
-    JSON.stringify(puntos),
-    JSON.stringify(geometria),
+    paradas,
+    puntos,
+    geometria,
     ubicacionRecolector?.latitude,
     ubicacionRecolector?.longitude,
   ]);

@@ -28,7 +28,10 @@ def _consultar(ruta: str, parametros: dict) -> object:
         },
     )
     try:
-        with urlopen(solicitud, timeout=10) as respuesta:
+        with urlopen(
+            solicitud,
+            timeout=configuracion.segundos_espera_servicios,
+        ) as respuesta:
             return json.loads(respuesta.read().decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, ValueError) as error:
         raise HTTPException(

@@ -17,9 +17,16 @@ export function ProveedorSesion({ children }) {
         const textoSesion = await AsyncStorage.getItem(CLAVE_SESION);
         if (textoSesion) {
           const sesionGuardada = JSON.parse(textoSesion);
+          if (!sesionGuardada?.token_acceso || !sesionGuardada?.usuario) {
+            throw new Error('Sesion guardada incompleta');
+          }
           guardarTokenAutorizacion(sesionGuardada.token_acceso);
           cambiarSesion(sesionGuardada);
         }
+      } catch {
+        guardarTokenAutorizacion(null);
+        cambiarSesion(null);
+        await AsyncStorage.removeItem(CLAVE_SESION);
       } finally {
         cambiarCargando(false);
       }

@@ -40,7 +40,7 @@ Backend:
 ```powershell
 cd backend
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 .\.venv\Scripts\python.exe -m uvicorn app.principal:aplicacion --host 0.0.0.0 --port 8000 --reload
 ```
 
@@ -59,6 +59,18 @@ docker compose up -d --build
 - Web: `http://127.0.0.1:8080`
 - API: `http://127.0.0.1:8000`
 - Swagger por el proxy web: `http://127.0.0.1:8080/api/docs`
+- Evidencias por el proxy web: `http://127.0.0.1:8080/evidencias/...`
+
+En Windows también se puede controlar todo desde un solo script:
+
+```powershell
+.\scripts\docker.ps1 iniciar
+.\scripts\docker.ps1 verificar
+.\scripts\docker.ps1 logs
+.\scripts\docker.ps1 apagar
+```
+
+El comando `apagar` conserva la base, las evidencias y los volúmenes.
 
 Consultar [docs/DESPLIEGUE_LAN.md](docs/DESPLIEGUE_LAN.md) antes de instalar en
 un servidor.
@@ -141,3 +153,7 @@ Leer primero [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md).
 
 La revisión de funciones, base de datos y pendientes está en
 [docs/AUDITORIA_TECNICA.md](docs/AUDITORIA_TECNICA.md).
+
+La separación entre la preparación actual y los requisitos que se comenzarán a
+implementar después está en
+[docs/PREPARACION_RUBRICA_3ER_CICLO.md](docs/PREPARACION_RUBRICA_3ER_CICLO.md).

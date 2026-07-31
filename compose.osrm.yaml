@@ -6,6 +6,11 @@ services:
   osrm-descarga:
     image: alpine:3.22
     restart: "no"
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
     environment:
       OSRM_PBF_URL: ${OSRM_PBF_URL:-https://download.geofabrik.de/north-america/mexico-latest.osm.pbf}
     volumes:
@@ -14,12 +19,21 @@ services:
       - /bin/sh
       - -c
       - >
-        test -f /data/mexico-latest.osm.pbf ||
-        wget -O /data/mexico-latest.osm.pbf "$${OSRM_PBF_URL}"
+        test -s /data/mexico-latest.osm.pbf ||
+        (
+          rm -f /data/mexico-latest.osm.pbf.part &&
+          wget -O /data/mexico-latest.osm.pbf.part "$${OSRM_PBF_URL}" &&
+          mv /data/mexico-latest.osm.pbf.part /data/mexico-latest.osm.pbf
+        )
 
   osrm-preparar:
     image: ghcr.io/project-osrm/osrm-backend:latest
     restart: "no"
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
     depends_on:
       osrm-descarga:
         condition: service_completed_successfully
@@ -39,7 +53,14 @@ services:
 
   osrm:
     image: ghcr.io/project-osrm/osrm-backend:latest
+    init: true
     restart: unless-stopped
+    stop_grace_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
     depends_on:
       osrm-preparar:
         condition: service_completed_successfully

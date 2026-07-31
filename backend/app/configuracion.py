@@ -20,6 +20,16 @@ class Configuracion(BaseModel):
     minutos_expiracion_token: int = Field(
         default_factory=lambda: int(os.getenv("VIC_TOKEN_EXPIRATION_MINUTES", str(60 * 24))),
     )
+    segundos_espera_sqlite: float = Field(
+        default_factory=lambda: float(os.getenv("VIC_SQLITE_TIMEOUT_SECONDS", "15")),
+        gt=0,
+        le=120,
+    )
+    segundos_espera_servicios: float = Field(
+        default_factory=lambda: float(os.getenv("VIC_HTTP_TIMEOUT_SECONDS", "10")),
+        gt=0,
+        le=60,
+    )
     origenes_cors: list[str] = Field(default_factory=leer_origenes_cors)
     ruta_raiz: str = Field(default_factory=lambda: os.getenv("VIC_ROOT_PATH", ""))
     url_enrutamiento: str = Field(

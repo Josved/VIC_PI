@@ -21,7 +21,15 @@ if (!TaskManager.isTaskDefined(TAREA_RASTREO)) {
     if (!ejecucionId || !textoSesion) {
       return;
     }
-    const sesion = JSON.parse(textoSesion);
+    let sesion;
+    try {
+      sesion = JSON.parse(textoSesion);
+    } catch {
+      return;
+    }
+    if (!sesion?.token_acceso) {
+      return;
+    }
     const posicion = data.locations[data.locations.length - 1];
     const cuerpo = {
       latitud: posicion.coords.latitude,

@@ -106,7 +106,10 @@ def calcular_recorrido(puntos: list[dict]) -> dict:
         },
     )
     try:
-        with urlopen(solicitud, timeout=10) as respuesta:
+        with urlopen(
+            solicitud,
+            timeout=configuracion.segundos_espera_servicios,
+        ) as respuesta:
             datos = json.loads(respuesta.read().decode("utf-8"))
         if datos.get("code") != "Ok" or not datos.get("routes"):
             raise ValueError(datos.get("message") or "OSRM no encontro una ruta")

@@ -25,6 +25,13 @@ docker compose up -d --build
 docker compose ps
 ```
 
+Alternativa simplificada para PowerShell:
+
+```powershell
+.\scripts\docker.ps1 iniciar
+.\scripts\docker.ps1 verificar
+```
+
 Servicios:
 
 - Aplicación web: `http://IP_DEL_SERVIDOR:VIC_WEB_PORT`
@@ -51,6 +58,12 @@ Ver registros:
 docker compose logs -f
 ```
 
+O bien:
+
+```powershell
+.\scripts\docker.ps1 logs
+```
+
 Reiniciar:
 
 ```powershell
@@ -73,6 +86,10 @@ docker compose down
 No usar `docker compose down -v` en el servidor: la opción `-v` elimina el
 volumen que contiene SQLite.
 
+Docker limita automáticamente cada archivo de log a 10 MB y conserva tres
+archivos por servicio. El frontend comprime los recursos web, mantiene en caché
+los archivos estáticos y reenvía tanto `/api` como `/evidencias` al backend.
+
 ## Motor de rutas vial dentro de la LAN
 
 Por defecto el backend consulta `https://router.project-osrm.org`. Para que el
@@ -80,6 +97,12 @@ cálculo de calles funcione sin Internet, se incluye `compose.osrm.yaml`:
 
 ```powershell
 docker compose -f compose.yaml -f compose.osrm.yaml up -d --build
+```
+
+Con el script:
+
+```powershell
+.\scripts\docker.ps1 iniciar -Osrm
 ```
 
 La primera ejecución descarga el mapa de México, lo prepara y crea el volumen
@@ -113,6 +136,16 @@ docker compose start backend
 
 Guardar los respaldos fuera del servidor principal.
 
+El script incluido respalda en un solo archivo la base y las evidencias:
+
+```powershell
+.\scripts\respaldar-datos.ps1
+```
+
+Los archivos quedan en `backups/`, una carpeta excluida de Git. El backend se
+detiene únicamente durante la copia y se vuelve a iniciar aunque la copia
+falle.
+
 ## Firewall
 
 Permitir `VIC_WEB_PORT/TCP` para los usuarios de la aplicación. Permitir
@@ -129,3 +162,12 @@ permisos de los contenedores.
 3. Restaurar `vic.db` dentro del volumen `vic_data`.
 4. Ejecutar `docker compose up -d --build`.
 5. Verificar `/api/salud`, `/api/docs` y la aplicación web.
+
+## Límites deliberados de esta etapa
+
+- La aplicación nativa se compila con Expo/EAS; no se ejecuta dentro de un
+  contenedor.
+- Nominatim continúa siendo externo, aunque `VIC_GEOCODING_URL` permite apuntar
+  a una futura instancia propia.
+- TLS, balanceo, firewall, monitoreo y separación público/privado pertenecen a
+  la siguiente etapa y no se simulan en este despliegue LAN.

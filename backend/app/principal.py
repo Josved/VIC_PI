@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 
 from . import modelos
 from .administracion import enrutador as enrutador_administracion
@@ -60,4 +61,6 @@ def revisar_servicio():
 
 @aplicacion.get("/salud", tags=["sistema"])
 def revisar_salud():
-    return {"estado": "ok"}
+    with SesionLocal() as base_datos:
+        base_datos.execute(text("SELECT 1"))
+    return {"estado": "ok", "base_datos": "ok"}

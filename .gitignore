@@ -12,6 +12,8 @@ venv/
 *.sqlite3
 *.log
 *.err
+backups/
+tmp/
 .agents/
 .playwright-cli/
 .claude/

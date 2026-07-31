@@ -1,6 +1,6 @@
 # Auditoría técnica y funcional de VIC
 
-Fecha de revisión: 2026-07-30
+Fecha de revisión: 2026-07-31
 
 ## Resumen
 
@@ -176,15 +176,23 @@ persistente.
 - Definir copias de seguridad del volumen SQLite.
 - Evaluar PostgreSQL si habrá varios procesos de escritura o crecimiento.
 - Realizar la etapa de seguridad antes de exponer el sistema fuera de la LAN.
+- Planificar la actualización mayor de Expo/React Native: el árbol actual tiene
+  28 avisos transitivos en `npm audit` (19 altos, 9 moderados y 0 críticos), sin
+  una corrección compatible que no cambie versiones mayores.
 
 ## Preparación aplicada
 
 - Configuración del backend mediante variables de entorno.
 - Base SQLite persistente mediante volumen Docker.
-- Endpoint de salud.
+- SQLite configurado con claves foráneas, modo WAL, espera ante escrituras
+  concurrentes y comprobación activa desde el endpoint de salud.
 - Imagen del backend con FastAPI/Uvicorn.
 - Compilación web de Expo y servicio estático con Nginx.
 - Proxy `/api` para que el navegador y la API compartan origen.
+- Proxy `/evidencias`, límite de carga de 9 MB, compresión y caché de recursos.
+- Rotación local de logs de los contenedores.
+- Scripts PowerShell para operación, verificación y respaldo.
 - Puerto directo de API para pruebas con Expo Go en la LAN.
 - Diez pruebas automatizadas de QR ciudadano, administración, suspensión de
   cuentas, GPS, reportes, rutas, recorridos, incidencias y permisos por rol.
+- Dependencias directas del backend fijadas y dependencias de prueba separadas.

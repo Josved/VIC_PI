@@ -27,11 +27,18 @@ export function MapaRuta({
   alto = 300,
 }) {
   const mapa = useRef(null);
-  const puntosVisibles = puntos.length > 0 ? puntos : paradas;
-  const coordenadasPuntos = puntosVisibles.map((punto) => ({
-    latitude: punto.latitud,
-    longitude: punto.longitud,
-  }));
+  const puntosVisibles = useMemo(
+    () => (puntos.length > 0 ? puntos : paradas),
+    [paradas, puntos],
+  );
+  const coordenadasPuntos = useMemo(
+    () =>
+      puntosVisibles.map((punto) => ({
+        latitude: punto.latitud,
+        longitude: punto.longitud,
+      })),
+    [puntosVisibles],
+  );
   const coordenadasRuta = useMemo(
     () =>
       (geometria.length > 0 ? geometria : puntosVisibles).map((punto) => ({
@@ -52,7 +59,11 @@ export function MapaRuta({
         animated: true,
       });
     }
-  }, [geometria, puntosVisibles.length]);
+  }, [
+    coordenadasRuta,
+    ubicacionRecolector?.latitude,
+    ubicacionRecolector?.longitude,
+  ]);
 
   const inicial =
     ubicacionRecolector || coordenadasPuntos[0] || coordenadasRuta[0] || REGION_INICIAL;
