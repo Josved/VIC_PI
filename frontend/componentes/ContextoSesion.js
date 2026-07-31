@@ -18,7 +18,7 @@ export function ProveedorSesion({ children }) {
         if (textoSesion) {
           const sesionGuardada = JSON.parse(textoSesion);
           if (!sesionGuardada?.token_acceso || !sesionGuardada?.usuario) {
-            throw new Error('Sesion guardada incompleta');
+            throw new Error('Sesión guardada incompleta');
           }
           guardarTokenAutorizacion(sesionGuardada.token_acceso);
           cambiarSesion(sesionGuardada);

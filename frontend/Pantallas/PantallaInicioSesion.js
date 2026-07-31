@@ -18,7 +18,7 @@ export function PantallaInicioSesion({ navigation }) {
 
   async function entrar() {
     if (!correo || !contrasena) {
-      setErrorFormulario('Escribe tu correo y contrasena.');
+      setErrorFormulario('Escribe tu correo y contraseña.');
       return;
     }
 
@@ -27,7 +27,12 @@ export function PantallaInicioSesion({ navigation }) {
       setCargando(true);
       await iniciarSesion({ correo, contrasena });
     } catch (error) {
-      setErrorFormulario(obtenerMensajeErrorApi(error, 'No se pudo iniciar sesion. Revisa que el backend este ejecutandose.'));
+      setErrorFormulario(
+        obtenerMensajeErrorApi(
+          error,
+          'No se pudo iniciar sesión. Revisa que el backend esté ejecutándose.',
+        ),
+      );
     } finally {
       setCargando(false);
     }
@@ -43,10 +48,10 @@ export function PantallaInicioSesion({ navigation }) {
 
       <View style={estilos.formulario}>
         <CampoTexto etiqueta="Correo" value={correo} onChangeText={setCorreo} autoCapitalize="none" keyboardType="email-address" />
-        <CampoTexto etiqueta="Contrasena" value={contrasena} onChangeText={setContrasena} secureTextEntry />
+        <CampoTexto etiqueta="Contraseña" value={contrasena} onChangeText={setContrasena} secureTextEntry />
         {errorFormulario ? <Text style={estilos.errorFormulario}>{errorFormulario}</Text> : null}
-        <Boton texto="Iniciar sesion" alPresionar={entrar} cargando={cargando} />
-        <Boton texto="Recuperar contrasena" variante="fantasma" alPresionar={() => navigation.navigate('RecuperarContrasena')} />
+        <Boton texto="Iniciar sesión" alPresionar={entrar} cargando={cargando} />
+        <Boton texto="Recuperar contraseña" variante="fantasma" alPresionar={() => navigation.navigate('RecuperarContrasena')} />
         <Boton texto="Crear cuenta" variante="secundario" alPresionar={() => navigation.navigate('Registro')} />
       </View>
     </PantallaBase>

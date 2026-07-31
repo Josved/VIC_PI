@@ -211,7 +211,7 @@ export function PantallaContenedores() {
         });
         direccion = respuestaDireccion.data;
       } catch {
-        // El GPS sigue siendo valido aunque el geocodificador no tenga conexion.
+        // El GPS sigue siendo válido aunque el geocodificador no tenga conexión.
       }
       const respuesta = await conexionApi.post('/contenedores/registrar-qr', {
         codigo_qr: codigoQr,

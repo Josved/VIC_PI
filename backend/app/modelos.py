@@ -283,7 +283,7 @@ class IncidenciaOperativa(Base):
 
 
 class DetalleContenedor(Base):
-    """Direccion legible separada para conservar bases de datos existentes."""
+    """Dirección legible separada para conservar bases de datos existentes."""
 
     __tablename__ = "detalles_contenedor"
 

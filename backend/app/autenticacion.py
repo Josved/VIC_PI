@@ -60,7 +60,7 @@ def obtener_usuario_actual(
 ) -> Usuario:
     id_usuario = leer_token_acceso(credenciales.credentials)
     if not id_usuario:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalido")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
 
     usuario = base_datos.get(Usuario, int(id_usuario))
     if not usuario:
@@ -70,7 +70,7 @@ def obtener_usuario_actual(
     if control and not control.activo:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="La cuenta esta suspendida. Contacta al administrador",
+            detail="La cuenta está suspendida. Contacta al administrador",
         )
 
     return usuario
@@ -80,7 +80,7 @@ def obtener_usuario_actual(
 def registrar_usuario(datos: RegistroEntrada, base_datos: Session = Depends(obtener_base_datos)):
     usuario_existente = base_datos.scalar(select(Usuario).where(Usuario.correo == datos.correo.lower()))
     if usuario_existente:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El correo ya esta registrado")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El correo ya está registrado")
 
     usuario = Usuario(
         nombre=datos.nombre.strip(),
@@ -107,13 +107,13 @@ def registrar_usuario(datos: RegistroEntrada, base_datos: Session = Depends(obte
 def iniciar_sesion(datos: InicioSesionEntrada, base_datos: Session = Depends(obtener_base_datos)):
     usuario = base_datos.scalar(select(Usuario).where(Usuario.correo == datos.correo.lower()))
     if not usuario or not verificar_contrasena(datos.contrasena, usuario.contrasena_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales invalidas")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales inválidas")
 
     control = obtener_control_usuario(base_datos, usuario.id)
     if control and not control.activo:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="La cuenta esta suspendida. Contacta al administrador",
+            detail="La cuenta está suspendida. Contacta al administrador",
         )
 
     return crear_sesion(usuario, base_datos)
@@ -121,12 +121,12 @@ def iniciar_sesion(datos: InicioSesionEntrada, base_datos: Session = Depends(obt
 
 @enrutador.post("/recuperar-contrasena")
 def recuperar_contrasena(datos: RecuperarContrasenaEntrada):
-    return {"mensaje": "Si el correo existe, se enviaran instrucciones de recuperacion", "correo": datos.correo}
+    return {"mensaje": "Si el correo existe, se enviarán instrucciones de recuperación", "correo": datos.correo}
 
 
 @enrutador.post("/restablecer-contrasena")
 def restablecer_contrasena(datos: RestablecerContrasenaEntrada):
-    return {"mensaje": "Endpoint preparado para integrar tokens de recuperacion"}
+    return {"mensaje": "Endpoint preparado para integrar tokens de recuperación"}
 
 
 @enrutador.get("/mi-usuario", response_model=UsuarioRespuesta)
@@ -152,7 +152,7 @@ def cambiar_contrasena(
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La contrasena actual no es correcta",
+            detail="La contraseña actual no es correcta",
         )
 
     usuario_actual.contrasena_hash = cifrar_contrasena(datos.contrasena_nueva)
@@ -170,4 +170,4 @@ def cambiar_contrasena(
             ),
         )
     base_datos.commit()
-    return {"mensaje": "Contrasena actualizada correctamente"}
+    return {"mensaje": "Contraseña actualizada correctamente"}

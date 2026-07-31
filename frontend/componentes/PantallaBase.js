@@ -3,11 +3,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colores, espaciado } from './tema';
 
-export function PantallaBase({ children, centrada = true }) {
+export function PantallaBase({ children, centrada = true, referenciaScroll = null }) {
   return (
     <SafeAreaView style={estilos.areaSegura}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={estilos.flexible}>
-        <ScrollView contentContainerStyle={estilos.contenido} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          ref={referenciaScroll}
+          contentContainerStyle={estilos.contenido}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={[estilos.interior, centrada && estilos.centrada]}>{children}</View>
         </ScrollView>
       </KeyboardAvoidingView>

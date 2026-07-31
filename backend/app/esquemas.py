@@ -90,7 +90,7 @@ class RegistroContenedorQREntrada(BaseModel):
     def normalizar_codigo_qr(cls, valor: str) -> str:
         codigo = valor.strip()
         if not codigo:
-            raise ValueError("El codigo QR no puede estar vacio")
+            raise ValueError("El código QR no puede estar vacío")
         return codigo
 
 
@@ -290,7 +290,7 @@ class RutaCrear(BaseModel):
     @classmethod
     def validar_contenedores(cls, valores: list[int]) -> list[int]:
         if any(valor <= 0 for valor in valores):
-            raise ValueError("Los contenedores seleccionados no son validos")
+            raise ValueError("Los contenedores seleccionados no son válidos")
         if len(valores) != len(set(valores)):
             raise ValueError("No se puede repetir un contenedor en la ruta")
         return valores
@@ -332,7 +332,7 @@ class RutaActualizar(BaseModel):
         if valores is None:
             return None
         if any(valor <= 0 for valor in valores):
-            raise ValueError("Los contenedores seleccionados no son validos")
+            raise ValueError("Los contenedores seleccionados no son válidos")
         if len(valores) != len(set(valores)):
             raise ValueError("No se puede repetir un contenedor en la ruta")
         return valores

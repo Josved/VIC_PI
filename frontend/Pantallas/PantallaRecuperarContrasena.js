@@ -23,9 +23,9 @@ export function PantallaRecuperarContrasena({ navigation }) {
     try {
       setCargando(true);
       await pedirRecuperacionContrasena(correo);
-      setMensaje('Si el correo existe, se enviaran instrucciones de recuperacion.');
+      setMensaje('Si el correo existe, se enviarán instrucciones de recuperación.');
     } catch (error) {
-      setMensaje(obtenerMensajeErrorApi(error, 'No se pudo solicitar la recuperacion.'));
+      setMensaje(obtenerMensajeErrorApi(error, 'No se pudo solicitar la recuperación.'));
     } finally {
       setCargando(false);
     }
@@ -34,7 +34,7 @@ export function PantallaRecuperarContrasena({ navigation }) {
   return (
     <PantallaBase>
       <View style={estilos.encabezado}>
-        <Text style={estilos.titulo}>Recuperar contrasena</Text>
+        <Text style={estilos.titulo}>Recuperar contraseña</Text>
         <Text style={estilos.subtitulo}>Ingresa tu correo para recibir instrucciones.</Text>
       </View>
 

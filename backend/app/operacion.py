@@ -58,7 +58,7 @@ def validar_responsable(ejecucion: EjecucionRuta, usuario: Usuario) -> None:
     if usuario.rol != "admin" and ejecucion.recolector_id != usuario.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Este recorrido esta asignado a otro recolector",
+            detail="Este recorrido está asignado a otro recolector",
         )
 
 
@@ -276,14 +276,14 @@ def iniciar_recorrido(
     if not ruta or not ruta.activa:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="La ruta no existe o esta pausada",
+            detail="La ruta no existe o está pausada",
         )
 
     asignacion = base_datos.get(AsignacionRuta, ruta_id)
     if not asignacion or asignacion.recolector_id != recolector.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="La ruta no esta asignada a este recolector",
+            detail="La ruta no está asignada a este recolector",
         )
 
     recorrido_activo = base_datos.scalar(
@@ -359,7 +359,7 @@ def actualizar_ubicacion(
     if ejecucion.estado != "en_recorrido":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="El recorrido ya no esta activo",
+            detail="El recorrido ya no está activo",
         )
     guardar_ubicacion(base_datos, ejecucion, recolector, datos)
     base_datos.commit()
@@ -382,7 +382,7 @@ def recalcular_recorrido(
     if ejecucion.estado != "en_recorrido":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="El recorrido ya no esta activo",
+            detail="El recorrido ya no está activo",
         )
     filas = base_datos.execute(
         select(ParadaEjecucionRuta, Contenedor)
@@ -447,7 +447,7 @@ def actualizar_parada(
     if ejecucion.estado != "en_recorrido":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="El recorrido ya no esta activo",
+            detail="El recorrido ya no está activo",
         )
     parada = base_datos.get(ParadaEjecucionRuta, parada_id)
     if not parada or parada.ejecucion_id != ejecucion.id:
@@ -480,7 +480,7 @@ def crear_incidencia(
     if ejecucion.estado != "en_recorrido":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="El recorrido ya no esta activo",
+            detail="El recorrido ya no está activo",
         )
 
     parada = None

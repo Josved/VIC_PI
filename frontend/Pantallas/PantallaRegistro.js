@@ -34,7 +34,7 @@ export function PantallaRegistro({ navigation }) {
   async function crearCuenta() {
     if (!validarNombre(formulario.nombre) || !validarNombre(formulario.apellidos)) {
       setErrorFormulario(
-        'Nombre y apellidos solo admiten letras, espacios, guion y apostrofe.',
+        'Nombre y apellidos solo admiten letras, espacios, guion y apóstrofo.',
       );
       return;
     }
@@ -43,7 +43,7 @@ export function PantallaRegistro({ navigation }) {
       return;
     }
     if (formulario.contrasena.length < 6 || formulario.contrasena.length > 72) {
-      setErrorFormulario('La contrasena debe tener entre 6 y 72 caracteres.');
+      setErrorFormulario('La contraseña debe tener entre 6 y 72 caracteres.');
       return;
     }
 
@@ -74,7 +74,7 @@ export function PantallaRegistro({ navigation }) {
         <CampoTexto etiqueta="Nombre" value={formulario.nombre} onChangeText={(valor) => cambiarCampo('nombre', valor)} maxLength={LARGO_MAXIMO_NOMBRE} />
         <CampoTexto etiqueta="Apellidos" value={formulario.apellidos} onChangeText={(valor) => cambiarCampo('apellidos', valor)} maxLength={LARGO_MAXIMO_NOMBRE} />
         <CampoTexto etiqueta="Correo" value={formulario.correo} onChangeText={(valor) => cambiarCampo('correo', valor)} autoCapitalize="none" keyboardType="email-address" />
-        <CampoTexto etiqueta="Contrasena" value={formulario.contrasena} onChangeText={(valor) => cambiarCampo('contrasena', valor)} secureTextEntry maxLength={72} />
+        <CampoTexto etiqueta="Contraseña" value={formulario.contrasena} onChangeText={(valor) => cambiarCampo('contrasena', valor)} secureTextEntry maxLength={72} />
         {errorFormulario ? <Text style={estilos.errorFormulario}>{errorFormulario}</Text> : null}
         <Boton texto="Registrarme" alPresionar={crearCuenta} cargando={cargando} />
         <Boton texto="Volver" variante="fantasma" alPresionar={() => navigation.goBack()} />

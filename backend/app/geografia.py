@@ -60,7 +60,7 @@ def _normalizar(resultado: dict) -> BusquedaDireccionRespuesta:
         or direccion.get("county")
     )
     return BusquedaDireccionRespuesta(
-        direccion_completa=resultado.get("display_name") or "Direccion sin nombre",
+        direccion_completa=resultado.get("display_name") or "Dirección sin nombre",
         latitud=float(resultado["lat"]),
         longitud=float(resultado["lon"]),
         calle=calle,

@@ -112,7 +112,7 @@ def calcular_recorrido(puntos: list[dict]) -> dict:
         ) as respuesta:
             datos = json.loads(respuesta.read().decode("utf-8"))
         if datos.get("code") != "Ok" or not datos.get("routes"):
-            raise ValueError(datos.get("message") or "OSRM no encontro una ruta")
+            raise ValueError(datos.get("message") or "OSRM no encontró una ruta")
         ruta = datos["routes"][0]
         geometria = [
             {"latitud": coordenada[1], "longitud": coordenada[0]}

@@ -14,6 +14,20 @@ function icono(etiqueta, color) {
   });
 }
 
+function iconoContenedor(orden, color) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="position:relative;width:38px;height:38px;border-radius:11px;background:${color};color:white;display:flex;align-items:center;justify-content:center;border:2px solid white;box-shadow:0 2px 8px #0005">
+      <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/>
+      </svg>
+      <span style="position:absolute;right:-7px;top:-7px;min-width:19px;height:19px;padding:0 3px;border-radius:10px;background:#17352b;color:white;border:2px solid white;display:flex;align-items:center;justify-content:center;font:800 9px sans-serif">${orden}</span>
+    </div>`,
+    iconSize: [38, 38],
+    iconAnchor: [19, 19],
+  });
+}
+
 export function MapaRuta({
   paradas = [],
   puntos = [],
@@ -90,6 +104,10 @@ export function MapaRuta({
     }
     puntosVisibles.forEach((punto, indice) => {
       const esPaso = punto.tipo === 'paso';
+      const esContenedor =
+        punto.tipo === 'contenedor'
+        || Boolean(punto.contenedor_id)
+        || Boolean(punto.codigo_qr);
       const color = esPaso
         ? '#FF9800'
         : punto.tipo === 'inicio'
@@ -98,7 +116,9 @@ export function MapaRuta({
             ? '#673AB7'
             : colores.secondary;
       const marcador = L.marker([punto.latitud, punto.longitud], {
-        icon: icono(`${indice + 1}`, color),
+        icon: esContenedor
+          ? iconoContenedor(indice + 1, color)
+          : icono(`${indice + 1}`, color),
       })
         .addTo(capa)
         .bindPopup(
