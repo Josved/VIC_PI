@@ -1,6 +1,6 @@
 from math import asin, cos, radians, sin, sqrt
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -12,6 +12,7 @@ from .esquemas import (
     RegistroContenedorQRRespuesta,
 )
 from .modelos import Contenedor, RegistroUbicacionContenedor, Usuario, ahora_utc
+from .permisos import requiere_rol
 
 enrutador = APIRouter(prefix="/contenedores", tags=["contenedores"])
 RADIO_TIERRA_M = 6_371_000
@@ -57,7 +58,7 @@ def crear_respuesta(
 @enrutador.post("/registrar-qr", response_model=RegistroContenedorQRRespuesta)
 def registrar_contenedor_por_qr(
     datos: RegistroContenedorQREntrada,
-    usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    usuario_actual: Usuario = Depends(requiere_rol("collector", "admin")),
     base_datos: Session = Depends(obtener_base_datos),
 ):
     contenedor = base_datos.scalar(
@@ -130,6 +131,21 @@ def obtener_contenedores_cercanos(
         crear_respuesta(contenedor, distancia)
         for distancia, contenedor in resultados[:limite]
     ]
+
+
+@enrutador.get("/{contenedor_id}", response_model=ContenedorRespuesta)
+def obtener_contenedor(
+    contenedor_id: int,
+    _usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    base_datos: Session = Depends(obtener_base_datos),
+):
+    contenedor = base_datos.get(Contenedor, contenedor_id)
+    if not contenedor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contenedor no encontrado",
+        )
+    return crear_respuesta(contenedor)
 
 
 @enrutador.get("", response_model=list[ContenedorRespuesta])

@@ -57,3 +57,30 @@ class RegistroUbicacionContenedor(Base):
     longitud: Mapped[float] = mapped_column(Float, nullable=False)
     precision_m: Mapped[float | None] = mapped_column(Float, nullable=True)
     registrado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
+
+
+class Reporte(Base):
+    __tablename__ = "reportes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    contenedor_id: Mapped[int] = mapped_column(
+        ForeignKey("contenedores.id"),
+        nullable=False,
+        index=True,
+    )
+    usuario_id: Mapped[int] = mapped_column(
+        ForeignKey("usuarios.id"),
+        nullable=False,
+        index=True,
+    )
+    motivo: Mapped[str] = mapped_column(String(40), nullable=False)
+    comentario: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    evidencia_url: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="pendiente")
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
+    actualizado_en: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=ahora_utc,
+        onupdate=ahora_utc,
+        nullable=False,
+    )

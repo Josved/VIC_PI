@@ -20,6 +20,7 @@ import {
 
 import { Boton } from '../componentes/Boton';
 import { conexionApi, obtenerMensajeErrorApi } from '../componentes/conexionApi';
+import { usarSesion } from '../componentes/ContextoSesion';
 import { EscanerQR } from '../componentes/EscanerQR';
 import { MapaContenedores } from '../componentes/MapaContenedores';
 import { PantallaBase } from '../componentes/PantallaBase';
@@ -42,6 +43,9 @@ function formatearDistancia(distanciaM) {
 }
 
 export function PantallaContenedores() {
+  const { usuario } = usarSesion();
+  const puedeRegistrar =
+    usuario?.rol === 'collector' || usuario?.rol === 'admin';
   const [estadoPermiso, cambiarEstadoPermiso] = useState('pendiente');
   const [ubicacion, cambiarUbicacion] = useState(null);
   const [contenedores, cambiarContenedores] = useState([]);
@@ -185,6 +189,13 @@ export function PantallaContenedores() {
   }
 
   async function abrirEscaner() {
+    if (!puedeRegistrar) {
+      Alert.alert(
+        'Acción restringida',
+        'Solo recolectores y administradores pueden registrar o mover contenedores.',
+      );
+      return;
+    }
     cambiarError('');
     try {
       await leerUbicacionActual(true);
@@ -257,9 +268,11 @@ export function PantallaContenedores() {
         </View>
 
         <View style={estilos.acciones}>
-          <View style={estilos.accionPrincipal}>
-            <Boton texto="Escanear QR" alPresionar={abrirEscaner} />
-          </View>
+          {puedeRegistrar ? (
+            <View style={estilos.accionPrincipal}>
+              <Boton texto="Escanear QR" alPresionar={abrirEscaner} />
+            </View>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Actualizar ubicación y contenedores"
@@ -273,6 +286,15 @@ export function PantallaContenedores() {
             )}
           </Pressable>
         </View>
+
+        {!puedeRegistrar ? (
+          <View style={estilos.avisoRol}>
+            <Text style={estilos.textoAvisoRol}>
+              Puedes consultar el mapa y enviar reportes. El alta o cambio de
+              ubicación por QR corresponde a recolectores y administradores.
+            </Text>
+          </View>
+        ) : null}
 
         <View style={estilos.estadoUbicacion}>
           <LocateFixed
@@ -468,6 +490,20 @@ const estilos = StyleSheet.create({
   },
   accionPrincipal: {
     flex: 1,
+  },
+  avisoRol: {
+    padding: espaciado.md,
+    marginBottom: espaciado.md,
+    borderWidth: 1,
+    borderColor: colores.border,
+    borderRadius: 14,
+    backgroundColor: colores.surface,
+  },
+  textoAvisoRol: {
+    color: colores.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '700',
   },
   botonIcono: {
     width: 50,

@@ -4,17 +4,15 @@ Fecha de revisión: 2026-07-30
 
 ## Resumen
 
-VIC tiene una base funcional para autenticación y una interfaz navegable para
-inicio, contenedores, reportes y perfil. En este momento sólo los usuarios se
-guardan en el backend. Los avisos, el calendario y los contenedores son datos
-locales de demostración; reportes todavía es una pantalla base.
+VIC tiene autenticación, navegación móvil, contenedores geográficos persistidos,
+historial de detecciones QR y reportes con seguimiento por rol. Los avisos y el
+calendario todavía son datos locales de demostración.
 
 ## Acciones disponibles
 
 ### Autenticación
 
-- Seleccionar rol: ciudadano, recolector o administrador.
-- Registrar una cuenta.
+- Registrar una cuenta pública, siempre como ciudadano.
 - Iniciar sesión.
 - Conservar la sesión localmente con AsyncStorage.
 - Consultar el usuario autenticado mediante la API.
@@ -23,6 +21,9 @@ locales de demostración; reportes todavía es una pantalla base.
 
 La solicitud de recuperación sólo devuelve una confirmación. Todavía no genera
 un token, no envía correo y no cambia la contraseña.
+
+Los perfiles recolector y administrador deben ser asignados de forma controlada;
+todavía no existe una pantalla administrativa para cambiar roles.
 
 ### Inicio y comunidad
 
@@ -44,10 +45,11 @@ No existen tablas ni endpoints para administrar avisos o calendarios.
 
 ### Reportes
 
-- Incluye el acceso al flujo funcional de registro por QR y GPS.
-
-Todavía no existe el reporte de incidencias con motivo, fotografía, evidencia y
-seguimiento.
+- Seleccionar un contenedor por QR, código o ID.
+- Registrar motivo, comentario y enlace de evidencia opcional.
+- Consultar los reportes propios.
+- Permitir a recolectores y administradores consultar todos los reportes.
+- Cambiar el estado a pendiente, en revisión o resuelto.
 
 ### Perfil
 
@@ -66,6 +68,11 @@ seguimiento.
 - `POST /contenedores/registrar-qr`: alta o actualización por QR y GPS.
 - `GET /contenedores/cercanos`: consulta autenticada por radio y distancia.
 - `GET /contenedores`: lista autenticada.
+- `GET /contenedores/{id}`: detalle autenticado.
+- `POST /reportes`: crea un reporte autenticado.
+- `GET /reportes/mios`: lista los reportes del usuario.
+- `GET /reportes`: lista global para recolector y administrador.
+- `PATCH /reportes/{id}/estado`: actualiza estado con rol autorizado.
 - `GET /docs`: documentación Swagger.
 
 ## Base de datos
@@ -90,24 +97,23 @@ La tabla de identidad es `usuarios`:
 | `creado_en` | DATETIME | Fecha de alta |
 | `actualizado_en` | DATETIME | Última actualización |
 
-La base revisada tenía cero usuarios. El módulo de mapa agrega:
-
 - `contenedores`: ubicación vigente, precisión, contador y usuarios de alta y
   actualización.
 - `registros_ubicacion_contenedor`: historial inmutable de detecciones con
   usuario, GPS, precisión y fecha.
+- `reportes`: contenedor, usuario, motivo, comentario, evidencia, estado y
+  marcas de tiempo.
 
-No existen todavía tablas para reportes de incidencias, avisos, calendario,
-archivos o tokens de recuperación.
+No existen todavía tablas para avisos, calendario, archivos o tokens de
+recuperación.
 
 ## Limitaciones antes de considerarlo completo
 
-- Completar administración, estados y permisos por rol para contenedores.
-- Implementar reportes, estados, evidencia y almacenamiento de archivos.
+- Implementar una pantalla administrativa para asignar roles.
+- Añadir almacenamiento real de archivos; por ahora la evidencia es una URL.
 - Implementar avisos y calendario desde el backend.
 - Implementar recuperación real de contraseña.
 - Añadir migraciones de esquema; actualmente se usa `create_all`.
-- Añadir pruebas automatizadas.
 - Definir copias de seguridad del volumen SQLite.
 - Evaluar PostgreSQL si habrá varios procesos de escritura o crecimiento.
 - Realizar la etapa de seguridad antes de exponer el sistema fuera de la LAN.
@@ -121,3 +127,4 @@ archivos o tokens de recuperación.
 - Compilación web de Expo y servicio estático con Nginx.
 - Proxy `/api` para que el navegador y la API compartan origen.
 - Puerto directo de API para pruebas con Expo Go en la LAN.
+- Pruebas automatizadas de QR, GPS, reportes y permisos por rol.

@@ -12,7 +12,15 @@ import { QrCode, X } from 'lucide-react-native';
 
 import { colores, espaciado } from './tema';
 
-export function EscanerQR({ visible, procesando, alCancelar, alDetectar }) {
+export function EscanerQR({
+  visible,
+  procesando,
+  alCancelar,
+  alDetectar,
+  titulo = 'Registrar contenedor',
+  indicacion = 'Centra el QR del contenedor dentro del recuadro',
+  textoProcesando = 'Obteniendo GPS y guardando…',
+}) {
   const [permiso, solicitarPermiso] = useCameraPermissions();
   const [bloqueado, cambiarBloqueado] = useState(false);
   const bloqueoInmediato = useRef(false);
@@ -50,7 +58,7 @@ export function EscanerQR({ visible, procesando, alCancelar, alDetectar }) {
         <View style={estilos.barra}>
           <View style={estilos.tituloFila}>
             <QrCode color={colores.white} size={24} />
-            <Text style={estilos.titulo}>Registrar contenedor</Text>
+            <Text style={estilos.titulo}>{titulo}</Text>
           </View>
           <Pressable
             accessibilityRole="button"
@@ -92,16 +100,12 @@ export function EscanerQR({ visible, procesando, alCancelar, alDetectar }) {
             />
             <View pointerEvents="none" style={estilos.superposicion}>
               <View style={estilos.marco} />
-              <Text style={estilos.indicacion}>
-                Centra el QR del contenedor dentro del recuadro
-              </Text>
+              <Text style={estilos.indicacion}>{indicacion}</Text>
             </View>
             {procesando ? (
               <View style={estilos.procesando}>
                 <ActivityIndicator color={colores.white} size="large" />
-                <Text style={estilos.textoProcesando}>
-                  Obteniendo GPS y guardando…
-                </Text>
+                <Text style={estilos.textoProcesando}>{textoProcesando}</Text>
               </View>
             ) : null}
           </View>

@@ -15,7 +15,6 @@ import { PantallaCarga } from './Pantallas/Pantalla_Carga';
 import { PantallaPerfil } from './Pantallas/PantallaPerfil';
 import { PantallaRegistro } from './Pantallas/PantallaRegistro';
 import { PantallaReportes } from './Pantallas/PantallaReportes';
-import { PantallaSeleccionRol } from './Pantallas/PantallaSeleccionRol';
 
 const PilaSesion = createNativeStackNavigator();
 const PestanasPrincipales = createBottomTabNavigator();
@@ -24,7 +23,6 @@ function NavegadorSesion() {
   return (
     <PilaSesion.Navigator screenOptions={{ headerShown: false }}>
       <PilaSesion.Screen name="InicioSesion" component={PantallaInicioSesion} />
-      <PilaSesion.Screen name="SeleccionRol" component={PantallaSeleccionRol} />
       <PilaSesion.Screen name="Registro" component={PantallaRegistro} />
       <PilaSesion.Screen name="RecuperarContrasena" component={PantallaRecuperarContrasena} />
     </PilaSesion.Navigator>

@@ -13,6 +13,7 @@ venv/
 *.log
 *.err
 .agents/
+.playwright-cli/
 .claude/
 CLAUDE.md
 AGENTS.md

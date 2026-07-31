@@ -75,6 +75,19 @@ documentadas en [docs/MAPAS_QR.md](docs/MAPAS_QR.md).
 La evidencia automatizada y las pruebas físicas pendientes están separadas en
 [docs/VALIDACION_MAPAS_QR.md](docs/VALIDACION_MAPAS_QR.md).
 
+## Perfiles y reportes
+
+- Los registros públicos siempre crean un perfil `citizen`.
+- `citizen` puede consultar contenedores cercanos y enviar reportes.
+- `collector` y `admin` pueden registrar o actualizar contenedores por QR.
+- `collector` y `admin` pueden consultar todos los reportes y cambiar su estado
+  entre pendiente, en revisión y resuelto.
+- La pantalla Reportes permite seleccionar un contenedor por QR o por búsqueda,
+  enviar motivo, comentario y enlace de evidencia, y consultar el seguimiento.
+
+La integración del módulo preparado por Víctor está documentada en
+[docs/INTEGRACION_VICTOR.md](docs/INTEGRACION_VICTOR.md).
+
 ## Documentacion del equipo
 
 Leer primero [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md).

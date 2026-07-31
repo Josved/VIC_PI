@@ -4,6 +4,10 @@ from typing import Literal
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 RolUsuario = Literal["citizen", "collector", "admin"]
+MotivoReporte = Literal["lleno", "danado", "sucio", "ubicacion_incorrecta", "otro"]
+EstadoReporte = Literal["pendiente", "en_revision", "resuelto"]
+
+PATRON_NOMBRE = r"^[A-Za-zÁÉÍÓÚÑÜáéíóúñü]+(?:[ '\-][A-Za-zÁÉÍÓÚÑÜáéíóúñü]+)*$"
 
 
 class UsuarioRespuesta(BaseModel):
@@ -19,16 +23,17 @@ class UsuarioRespuesta(BaseModel):
 
 
 class RegistroEntrada(BaseModel):
-    nombre: str = Field(min_length=2, max_length=80)
-    apellidos: str = Field(min_length=2, max_length=120)
+    nombre: str = Field(min_length=2, max_length=50, pattern=PATRON_NOMBRE)
+    apellidos: str = Field(min_length=2, max_length=50, pattern=PATRON_NOMBRE)
     correo: EmailStr
-    contrasena: str = Field(min_length=6)
-    rol: RolUsuario = "citizen"
+    contrasena: str = Field(min_length=6, max_length=72)
+
+    model_config = {"extra": "forbid"}
 
 
 class InicioSesionEntrada(BaseModel):
     correo: EmailStr
-    contrasena: str = Field(min_length=6)
+    contrasena: str = Field(min_length=6, max_length=72)
 
 
 class RecuperarContrasenaEntrada(BaseModel):
@@ -37,7 +42,7 @@ class RecuperarContrasenaEntrada(BaseModel):
 
 class RestablecerContrasenaEntrada(BaseModel):
     token: str
-    contrasena: str = Field(min_length=6)
+    contrasena: str = Field(min_length=6, max_length=72)
 
 
 class SesionRespuesta(BaseModel):
@@ -80,3 +85,28 @@ class ContenedorRespuesta(BaseModel):
 class RegistroContenedorQRRespuesta(BaseModel):
     accion: Literal["creado", "actualizado"]
     contenedor: ContenedorRespuesta
+
+
+class ReporteCrear(BaseModel):
+    contenedor_id: int = Field(gt=0)
+    motivo: MotivoReporte
+    comentario: str | None = Field(default=None, max_length=500)
+    evidencia_url: str | None = Field(default=None, max_length=300)
+
+
+class ReporteRespuesta(BaseModel):
+    id: int
+    contenedor_id: int
+    usuario_id: int
+    motivo: MotivoReporte
+    comentario: str | None
+    evidencia_url: str | None
+    estado: EstadoReporte
+    creado_en: datetime
+    actualizado_en: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ReporteActualizarEstado(BaseModel):
+    estado: EstadoReporte

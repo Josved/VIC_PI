@@ -11,7 +11,7 @@ os.environ["VIC_JWT_SECRET"] = "secreto-exclusivo-para-pruebas"
 from starlette.testclient import TestClient
 
 from app.base_datos import SesionLocal, motor_base_datos
-from app.modelos import RegistroUbicacionContenedor
+from app.modelos import RegistroUbicacionContenedor, Usuario
 from app.principal import aplicacion
 
 
@@ -26,12 +26,34 @@ class PruebasContenedores(unittest.TestCase):
                 "apellidos": "Pruebas",
                 "correo": "mapas@example.com",
                 "contrasena": "Prueba123!",
-                "rol": "citizen",
             },
         )
         assert respuesta.status_code == 201, respuesta.text
-        cls.encabezados = {
+        cls.encabezados_ciudadano = {
             "Authorization": f"Bearer {respuesta.json()['token_acceso']}",
+        }
+
+        respuesta_recolector = cls.cliente.post(
+            "/autenticacion/registro",
+            json={
+                "nombre": "Recolector",
+                "apellidos": "Pruebas",
+                "correo": "recolector@example.com",
+                "contrasena": "Prueba123!",
+            },
+        )
+        assert respuesta_recolector.status_code == 201, respuesta_recolector.text
+        with SesionLocal() as base_datos:
+            recolector = (
+                base_datos.query(Usuario)
+                .filter_by(correo="recolector@example.com")
+                .one()
+            )
+            recolector.rol = "collector"
+            base_datos.commit()
+
+        cls.encabezados = {
+            "Authorization": f"Bearer {respuesta_recolector.json()['token_acceso']}",
         }
 
     @classmethod
@@ -122,6 +144,83 @@ class PruebasContenedores(unittest.TestCase):
             params={"latitud": 19.4326, "longitud": -99.1332},
         )
         self.assertEqual(respuesta.status_code, 401)
+
+    def test_registro_publico_no_permite_elegir_rol(self):
+        respuesta = self.cliente.post(
+            "/autenticacion/registro",
+            json={
+                "nombre": "Administrador",
+                "apellidos": "Falso",
+                "correo": "falso-admin@example.com",
+                "contrasena": "Prueba123!",
+                "rol": "admin",
+            },
+        )
+        self.assertEqual(respuesta.status_code, 422, respuesta.text)
+
+    def test_ciudadano_no_puede_registrar_contenedores(self):
+        respuesta = self.cliente.post(
+            "/contenedores/registrar-qr",
+            headers=self.encabezados_ciudadano,
+            json={
+                "codigo_qr": "VIC:CONTENEDOR:NO-AUTORIZADO",
+                "latitud": 19.4326,
+                "longitud": -99.1332,
+            },
+        )
+        self.assertEqual(respuesta.status_code, 403, respuesta.text)
+
+    def test_reportes_y_permisos_por_rol(self):
+        contenedor = self.cliente.post(
+            "/contenedores/registrar-qr",
+            headers=self.encabezados,
+            json={
+                "codigo_qr": "VIC:CONTENEDOR:REPORTE-001",
+                "latitud": 19.4326,
+                "longitud": -99.1332,
+                "precision_m": 4,
+            },
+        )
+        self.assertEqual(contenedor.status_code, 200, contenedor.text)
+        contenedor_id = contenedor.json()["contenedor"]["id"]
+
+        reporte = self.cliente.post(
+            "/reportes",
+            headers=self.encabezados_ciudadano,
+            json={
+                "contenedor_id": contenedor_id,
+                "motivo": "lleno",
+                "comentario": "El contenedor necesita recoleccion.",
+            },
+        )
+        self.assertEqual(reporte.status_code, 201, reporte.text)
+        reporte_id = reporte.json()["id"]
+        self.assertEqual(reporte.json()["estado"], "pendiente")
+
+        listado_no_autorizado = self.cliente.get(
+            "/reportes",
+            headers=self.encabezados_ciudadano,
+        )
+        self.assertEqual(listado_no_autorizado.status_code, 403)
+
+        mis_reportes = self.cliente.get(
+            "/reportes/mios",
+            headers=self.encabezados_ciudadano,
+        )
+        self.assertEqual(mis_reportes.status_code, 200, mis_reportes.text)
+        self.assertIn(reporte_id, [item["id"] for item in mis_reportes.json()])
+
+        todos = self.cliente.get("/reportes", headers=self.encabezados)
+        self.assertEqual(todos.status_code, 200, todos.text)
+        self.assertIn(reporte_id, [item["id"] for item in todos.json()])
+
+        actualizado = self.cliente.patch(
+            f"/reportes/{reporte_id}/estado",
+            headers=self.encabezados,
+            json={"estado": "resuelto"},
+        )
+        self.assertEqual(actualizado.status_code, 200, actualizado.text)
+        self.assertEqual(actualizado.json()["estado"], "resuelto")
 
 
 if __name__ == "__main__":
