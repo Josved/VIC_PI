@@ -1,16 +1,28 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import case, delete, select
+from sqlalchemy import case, delete, or_, select
 from sqlalchemy.orm import Session
 
 from .autenticacion import obtener_usuario_actual
 from .base_datos import obtener_base_datos
 from .esquemas import (
     ContenedorRutaRespuesta,
+    OperacionRutaResumenRespuesta,
     RutaActualizar,
     RutaCrear,
     RutaRespuesta,
+    UsuarioRutaRespuesta,
 )
-from .modelos import Contenedor, RutaContenedor, RutaRecoleccion, Usuario, ahora_utc
+from .modelos import (
+    AsignacionRuta,
+    Contenedor,
+    ControlUsuario,
+    EjecucionRuta,
+    ParadaEjecucionRuta,
+    RutaContenedor,
+    RutaRecoleccion,
+    Usuario,
+    ahora_utc,
+)
 from .permisos import requiere_rol
 
 enrutador = APIRouter(prefix="/rutas", tags=["rutas"])
@@ -34,7 +46,11 @@ def obtener_contenedores_validos(
         select(Contenedor).where(Contenedor.id.in_(contenedor_ids)),
     ).all()
     por_id = {contenedor.id: contenedor for contenedor in contenedores}
-    faltantes = [contenedor_id for contenedor_id in contenedor_ids if contenedor_id not in por_id]
+    faltantes = [
+        contenedor_id
+        for contenedor_id in contenedor_ids
+        if contenedor_id not in por_id
+    ]
     if faltantes:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -49,7 +65,9 @@ def guardar_contenedores_de_ruta(
     contenedor_ids: list[int],
 ) -> None:
     obtener_contenedores_validos(base_datos, contenedor_ids)
-    base_datos.execute(delete(RutaContenedor).where(RutaContenedor.ruta_id == ruta_id))
+    base_datos.execute(
+        delete(RutaContenedor).where(RutaContenedor.ruta_id == ruta_id),
+    )
     base_datos.add_all(
         [
             RutaContenedor(
@@ -59,6 +77,81 @@ def guardar_contenedores_de_ruta(
             )
             for indice, contenedor_id in enumerate(contenedor_ids, start=1)
         ],
+    )
+
+
+def obtener_recolector_valido(
+    base_datos: Session,
+    recolector_id: int,
+) -> Usuario:
+    recolector = base_datos.get(Usuario, recolector_id)
+    control = base_datos.get(ControlUsuario, recolector_id)
+    if (
+        not recolector
+        or recolector.rol != "collector"
+        or (control and not control.activo)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El recolector seleccionado no existe o esta suspendido",
+        )
+    return recolector
+
+
+def guardar_asignacion(
+    base_datos: Session,
+    ruta_id: int,
+    recolector_id: int,
+    asignado_por_id: int,
+) -> None:
+    obtener_recolector_valido(base_datos, recolector_id)
+    asignacion = base_datos.get(AsignacionRuta, ruta_id)
+    if asignacion:
+        asignacion.recolector_id = recolector_id
+        asignacion.asignado_por_id = asignado_por_id
+        asignacion.actualizado_en = ahora_utc()
+        return
+    base_datos.add(
+        AsignacionRuta(
+            ruta_id=ruta_id,
+            recolector_id=recolector_id,
+            asignado_por_id=asignado_por_id,
+        ),
+    )
+
+
+def calcular_operacion(
+    base_datos: Session,
+    ruta_id: int,
+) -> OperacionRutaResumenRespuesta | None:
+    ejecucion = base_datos.scalar(
+        select(EjecucionRuta)
+        .where(EjecucionRuta.ruta_id == ruta_id)
+        .order_by(EjecucionRuta.id.desc()),
+    )
+    if not ejecucion:
+        return None
+
+    paradas = base_datos.scalars(
+        select(ParadaEjecucionRuta).where(
+            ParadaEjecucionRuta.ejecucion_id == ejecucion.id,
+        ),
+    ).all()
+    atendidas = sum(parada.estado != "pendiente" for parada in paradas)
+    total = len(paradas)
+    progreso = round((atendidas / total) * 100) if total else 0
+    return OperacionRutaResumenRespuesta(
+        ejecucion_id=ejecucion.id,
+        estado=ejecucion.estado,
+        progreso_porcentaje=progreso,
+        paradas_atendidas=atendidas,
+        paradas_totales=total,
+        latitud_actual=ejecucion.latitud_actual,
+        longitud_actual=ejecucion.longitud_actual,
+        precision_m_actual=ejecucion.precision_m_actual,
+        ubicacion_actualizada_en=ejecucion.ubicacion_actualizada_en,
+        iniciado_en=ejecucion.iniciado_en,
+        finalizado_en=ejecucion.finalizado_en,
     )
 
 
@@ -72,6 +165,12 @@ def crear_respuesta_ruta(
         .where(RutaContenedor.ruta_id == ruta.id)
         .order_by(RutaContenedor.orden),
     ).all()
+    asignacion = base_datos.get(AsignacionRuta, ruta.id)
+    recolector = (
+        base_datos.get(Usuario, asignacion.recolector_id)
+        if asignacion
+        else None
+    )
     return RutaRespuesta(
         id=ruta.id,
         nombre=ruta.nombre,
@@ -81,11 +180,24 @@ def crear_respuesta_ruta(
         descripcion=ruta.descripcion,
         activa=ruta.activa,
         creado_por_id=ruta.creado_por_id,
+        recolector=(
+            UsuarioRutaRespuesta(
+                id=recolector.id,
+                nombre=recolector.nombre,
+                apellidos=recolector.apellidos,
+                correo=recolector.correo,
+            )
+            if recolector
+            else None
+        ),
+        operacion=calcular_operacion(base_datos, ruta.id),
         contenedores=[
             ContenedorRutaRespuesta(
                 id=contenedor.id,
                 codigo_qr=contenedor.codigo_qr,
                 orden=relacion.orden,
+                latitud=contenedor.latitud,
+                longitud=contenedor.longitud,
             )
             for relacion, contenedor in filas
         ],
@@ -139,7 +251,15 @@ def listar_rutas_gestionables(
 ):
     consulta = consulta_ordenada()
     if usuario_actual.rol != "admin":
-        consulta = consulta.where(RutaRecoleccion.creado_por_id == usuario_actual.id)
+        rutas_asignadas = select(AsignacionRuta.ruta_id).where(
+            AsignacionRuta.recolector_id == usuario_actual.id,
+        )
+        consulta = consulta.where(
+            or_(
+                RutaRecoleccion.creado_por_id == usuario_actual.id,
+                RutaRecoleccion.id.in_(rutas_asignadas),
+            ),
+        )
     rutas = base_datos.scalars(consulta).all()
     return [crear_respuesta_ruta(base_datos, ruta) for ruta in rutas]
 
@@ -150,6 +270,20 @@ def crear_ruta(
     usuario_actual: Usuario = Depends(requiere_rol("collector", "admin")),
     base_datos: Session = Depends(obtener_base_datos),
 ):
+    recolector_id = datos.recolector_id
+    if usuario_actual.rol == "collector":
+        if recolector_id not in (None, usuario_actual.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No puedes asignar una ruta a otro recolector",
+            )
+        recolector_id = usuario_actual.id
+    elif recolector_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Selecciona el recolector responsable",
+        )
+
     obtener_contenedores_validos(base_datos, datos.contenedor_ids)
     ruta = RutaRecoleccion(
         nombre=datos.nombre,
@@ -162,6 +296,12 @@ def crear_ruta(
     base_datos.add(ruta)
     base_datos.flush()
     guardar_contenedores_de_ruta(base_datos, ruta.id, datos.contenedor_ids)
+    guardar_asignacion(
+        base_datos,
+        ruta.id,
+        recolector_id,
+        usuario_actual.id,
+    )
     base_datos.commit()
     base_datos.refresh(ruta)
     return crear_respuesta_ruta(base_datos, ruta)
@@ -178,6 +318,31 @@ def actualizar_ruta(
     validar_gestion(ruta, usuario_actual)
     cambios = datos.model_dump(exclude_unset=True)
     contenedor_ids = cambios.pop("contenedor_ids", None)
+    recolector_id = cambios.pop("recolector_id", None)
+
+    if recolector_id is not None:
+        if usuario_actual.rol != "admin" and recolector_id != usuario_actual.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo el administrador puede reasignar rutas",
+            )
+        ejecucion_activa = base_datos.scalar(
+            select(EjecucionRuta).where(
+                EjecucionRuta.ruta_id == ruta.id,
+                EjecucionRuta.estado == "en_recorrido",
+            ),
+        )
+        if ejecucion_activa:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="No se puede reasignar una ruta en recorrido",
+            )
+        guardar_asignacion(
+            base_datos,
+            ruta.id,
+            recolector_id,
+            usuario_actual.id,
+        )
 
     for campo, valor in cambios.items():
         setattr(ruta, campo, valor)

@@ -195,6 +195,16 @@ Estado actual del modulo 4:
 - Recolectores y administradores crean y editan rutas semanales con día, hora,
   zona y contenedores ordenados.
 - Las rutas activas alimentan el calendario del ciudadano.
+- Admin asigna un responsable; el recolector inicia el recorrido, transmite GPS,
+  atiende paradas, registra incidencias y cierra el servicio.
+- El ciudadano consulta avance y ubicación en el detalle del calendario.
+
+### Modulo 6: Administración
+
+- Implementado en `frontend/Pantallas/PantallaAdministracion.js`.
+- Admin crea personal autorizado, cambia roles, suspende o reactiva cuentas y
+  restablece contraseñas temporales.
+- Admin consulta incidencias operativas.
 
 ## Reglas de trabajo
 
@@ -217,6 +227,8 @@ Los componentes reutilizables viven en `frontend/componentes`:
 - `PantallaBase`: layout base con SafeArea y scroll.
 - `LogoVIC`: representacion temporal del logo usando iconos y colores VIC.
 - `ContextoSesion`: guarda usuario, token y funciones de sesion.
+- `PanelRecorrido`: operación GPS, paradas e incidencias del recolector.
+- `MapaRuta`: recorrido, contenedores y ubicación actual en Android/iOS.
 
 Tokens visuales:
 
@@ -232,6 +244,9 @@ Carpeta principal: `backend/app`
 
 - `principal.py`: crea la aplicacion, CORS, rutas y tablas.
 - `autenticacion.py`: endpoints de autenticacion.
+- `administracion.py`: control de usuarios, roles y contraseñas temporales.
+- `rutas.py`: planeación y asignación semanal.
+- `operacion.py`: recorridos, GPS, paradas e incidencias.
 - `modelos.py`: usuarios, contenedores, historial GPS, reportes y rutas.
 - `esquemas.py`: contratos Pydantic de autenticación, contenedores, reportes y rutas.
 - `seguridad.py`: hash de contrasena y JWT.
@@ -255,6 +270,7 @@ La base local `backend/vic.db` se genera automaticamente y NO debe subirse a Git
 - Modulo 3 implementado en `frontend/Pantallas/PantallaContenedores.js`.
 - Modulo 4 de reportes implementado.
 - Modulo 5 de rutas semanales implementado.
+- Modulo 6 de administración y operación en vivo implementado.
 - Frontend y backend probados en web.
 - `npm run typecheck` pasa correctamente.
 
@@ -270,6 +286,7 @@ Se valido:
 - Cierre de sesion.
 - Recuperacion de contrasena con mensaje de confirmacion.
 - Correccion de `EXPO_PUBLIC_API_URL` con protocolo `http://`.
+- Administración de recolectores, asignación de rutas y seguimiento de recorridos.
 
 ## Pendientes conocidos
 

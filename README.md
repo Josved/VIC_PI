@@ -94,6 +94,19 @@ La evidencia automatizada y las pruebas físicas pendientes están separadas en
 - Los ciudadanos consultan las rutas activas desde Inicio.
 - Los días con recolección aparecen en verde y abren un detalle con horario,
   zona y cantidad de contenedores.
+- El administrador asigna cada ruta a un recolector activo.
+- El recolector inicia el recorrido, comparte GPS, atiende u omite paradas,
+  registra incidencias y finaliza o cancela el servicio.
+- El ciudadano consulta el progreso y la ubicación del recolector durante un
+  recorrido activo; la pantalla se actualiza automáticamente.
+
+## Administración de personal
+
+- El registro público nunca permite elegir un rol privilegiado.
+- Admin crea cuentas autorizadas con contraseña temporal.
+- Admin cambia roles, suspende o reactiva cuentas y restablece contraseñas.
+- Las cuentas suspendidas pierden acceso incluso si conservan un JWT anterior.
+- Cada usuario puede cambiar su contraseña desde Perfil.
 
 La integración del módulo preparado por Víctor está documentada en
 [docs/INTEGRACION_VICTOR.md](docs/INTEGRACION_VICTOR.md).

@@ -2,12 +2,13 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import { Home, MapPinned, QrCode, Route, UserRound } from 'lucide-react-native';
+import { Home, MapPinned, QrCode, Route, ShieldCheck, UserRound } from 'lucide-react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ProveedorSesion, usarSesion } from './componentes/ContextoSesion';
 import { colores } from './componentes/tema';
 import { PantallaContenedores } from './Pantallas/PantallaContenedores';
+import { PantallaAdministracion } from './Pantallas/PantallaAdministracion';
 import { PantallaRecuperarContrasena } from './Pantallas/PantallaRecuperarContrasena';
 import { PantallaInicio } from './Pantallas/PantallaInicio';
 import { PantallaInicioSesion } from './Pantallas/PantallaInicioSesion';
@@ -71,6 +72,16 @@ function NavegadorPrincipal() {
           options={{
             tabBarLabel: 'Rutas',
             tabBarIcon: ({ color }) => <Route color={color} size={22} />,
+          }}
+        />
+      ) : null}
+      {usuario?.rol === 'admin' ? (
+        <PestanasPrincipales.Screen
+          name="Administracion"
+          component={PantallaAdministracion}
+          options={{
+            tabBarLabel: 'Admin',
+            tabBarIcon: ({ color }) => <ShieldCheck color={color} size={22} />,
           }}
         />
       ) : null}

@@ -54,6 +54,17 @@ export function ProveedorSesion({ children }) {
     await AsyncStorage.removeItem(CLAVE_SESION);
   }
 
+  async function refrescarUsuario() {
+    if (!sesion?.token_acceso) {
+      return null;
+    }
+    const respuesta = await conexionApi.get('/autenticacion/mi-usuario');
+    const nuevaSesion = { ...sesion, usuario: respuesta.data };
+    cambiarSesion(nuevaSesion);
+    await AsyncStorage.setItem(CLAVE_SESION, JSON.stringify(nuevaSesion));
+    return respuesta.data;
+  }
+
   const datosSesion = useMemo(
     () => ({
       usuario: sesion?.usuario || null,
@@ -62,6 +73,7 @@ export function ProveedorSesion({ children }) {
       iniciarSesion,
       registrarCuenta,
       pedirRecuperacionContrasena,
+      refrescarUsuario,
       cerrarSesion,
     }),
     [cargando, sesion],

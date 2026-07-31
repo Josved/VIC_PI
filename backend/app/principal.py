@@ -2,12 +2,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import modelos
+from .administracion import enrutador as enrutador_administracion
 from .autenticacion import enrutador as enrutador_autenticacion
 from .base_datos import Base, motor_base_datos
 from .configuracion import configuracion
 from .contenedores import enrutador as enrutador_contenedores
 from .reportes import enrutador as enrutador_reportes
 from .rutas import enrutador as enrutador_rutas
+from .operacion import enrutador as enrutador_operacion
 
 Base.metadata.create_all(bind=motor_base_datos)
 
@@ -28,6 +30,8 @@ aplicacion.include_router(enrutador_autenticacion)
 aplicacion.include_router(enrutador_contenedores)
 aplicacion.include_router(enrutador_reportes)
 aplicacion.include_router(enrutador_rutas)
+aplicacion.include_router(enrutador_administracion)
+aplicacion.include_router(enrutador_operacion)
 
 
 @aplicacion.get("/")

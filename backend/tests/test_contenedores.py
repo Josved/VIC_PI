@@ -51,9 +51,32 @@ class PruebasContenedores(unittest.TestCase):
             )
             recolector.rol = "collector"
             base_datos.commit()
+            cls.recolector_id = recolector.id
 
         cls.encabezados = {
             "Authorization": f"Bearer {respuesta_recolector.json()['token_acceso']}",
+        }
+
+        respuesta_admin = cls.cliente.post(
+            "/autenticacion/registro",
+            json={
+                "nombre": "Admin",
+                "apellidos": "Pruebas",
+                "correo": "admin@example.com",
+                "contrasena": "Prueba123!",
+            },
+        )
+        assert respuesta_admin.status_code == 201, respuesta_admin.text
+        with SesionLocal() as base_datos:
+            administrador = (
+                base_datos.query(Usuario)
+                .filter_by(correo="admin@example.com")
+                .one()
+            )
+            administrador.rol = "admin"
+            base_datos.commit()
+        cls.encabezados_admin = {
+            "Authorization": f"Bearer {respuesta_admin.json()['token_acceso']}",
         }
 
     @classmethod
@@ -317,6 +340,190 @@ class PruebasContenedores(unittest.TestCase):
 
         gestionables = self.cliente.get("/rutas/mias", headers=self.encabezados)
         self.assertIn(ruta_id, [ruta["id"] for ruta in gestionables.json()])
+
+    def test_administracion_segura_de_recolectores(self):
+        no_autorizado = self.cliente.get(
+            "/administracion/usuarios",
+            headers=self.encabezados_ciudadano,
+        )
+        self.assertEqual(no_autorizado.status_code, 403, no_autorizado.text)
+
+        creacion = self.cliente.post(
+            "/administracion/usuarios",
+            headers=self.encabezados_admin,
+            json={
+                "nombre": "Nuevo",
+                "apellidos": "Recolector",
+                "correo": "nuevo-recolector@example.com",
+                "contrasena_temporal": "Temporal#2026",
+                "rol": "collector",
+            },
+        )
+        self.assertEqual(creacion.status_code, 201, creacion.text)
+        usuario_id = creacion.json()["id"]
+        self.assertTrue(creacion.json()["activo"])
+        self.assertTrue(creacion.json()["requiere_cambio_contrasena"])
+
+        inicio = self.cliente.post(
+            "/autenticacion/iniciar-sesion",
+            json={
+                "correo": "nuevo-recolector@example.com",
+                "contrasena": "Temporal#2026",
+            },
+        )
+        self.assertEqual(inicio.status_code, 200, inicio.text)
+        encabezados_nuevo = {
+            "Authorization": f"Bearer {inicio.json()['token_acceso']}",
+        }
+        self.assertEqual(inicio.json()["usuario"]["rol"], "collector")
+        self.assertTrue(inicio.json()["usuario"]["requiere_cambio_contrasena"])
+
+        cambio = self.cliente.post(
+            "/autenticacion/cambiar-contrasena",
+            headers=encabezados_nuevo,
+            json={
+                "contrasena_actual": "Temporal#2026",
+                "contrasena_nueva": "Definitiva#2026",
+            },
+        )
+        self.assertEqual(cambio.status_code, 200, cambio.text)
+
+        suspension = self.cliente.patch(
+            f"/administracion/usuarios/{usuario_id}",
+            headers=self.encabezados_admin,
+            json={"activo": False},
+        )
+        self.assertEqual(suspension.status_code, 200, suspension.text)
+        self.assertFalse(suspension.json()["activo"])
+
+        token_suspendido = self.cliente.get(
+            "/contenedores",
+            headers=encabezados_nuevo,
+        )
+        self.assertEqual(token_suspendido.status_code, 403, token_suspendido.text)
+
+        inicio_suspendido = self.cliente.post(
+            "/autenticacion/iniciar-sesion",
+            json={
+                "correo": "nuevo-recolector@example.com",
+                "contrasena": "Definitiva#2026",
+            },
+        )
+        self.assertEqual(inicio_suspendido.status_code, 403, inicio_suspendido.text)
+
+        reactivacion = self.cliente.patch(
+            f"/administracion/usuarios/{usuario_id}",
+            headers=self.encabezados_admin,
+            json={"activo": True},
+        )
+        self.assertEqual(reactivacion.status_code, 200, reactivacion.text)
+        self.assertTrue(reactivacion.json()["activo"])
+
+    def test_recorrido_gps_paradas_incidencias_y_seguimiento(self):
+        contenedor = self.cliente.post(
+            "/contenedores/registrar-qr",
+            headers=self.encabezados_ciudadano,
+            json={
+                "codigo_qr": "VIC:CONTENEDOR:OPERACION-001",
+                "latitud": 20.5994,
+                "longitud": -100.3327,
+                "precision_m": 4,
+            },
+        )
+        self.assertEqual(contenedor.status_code, 200, contenedor.text)
+        contenedor_id = contenedor.json()["contenedor"]["id"]
+
+        ruta = self.cliente.post(
+            "/rutas",
+            headers=self.encabezados_admin,
+            json={
+                "nombre": "Ruta Operativa",
+                "zona": "Zona de pruebas",
+                "dia_semana": "viernes",
+                "hora_aproximada": "07:45",
+                "contenedor_ids": [contenedor_id],
+                "recolector_id": self.recolector_id,
+            },
+        )
+        self.assertEqual(ruta.status_code, 201, ruta.text)
+        ruta_id = ruta.json()["id"]
+        self.assertEqual(ruta.json()["recolector"]["id"], self.recolector_id)
+
+        inicio = self.cliente.post(
+            f"/operacion/rutas/{ruta_id}/iniciar",
+            headers=self.encabezados,
+            json={
+                "latitud": 20.5990,
+                "longitud": -100.3330,
+                "precision_m": 6,
+            },
+        )
+        self.assertEqual(inicio.status_code, 201, inicio.text)
+        ejecucion_id = inicio.json()["id"]
+        parada_id = inicio.json()["paradas"][0]["id"]
+        self.assertEqual(inicio.json()["estado"], "en_recorrido")
+        self.assertEqual(inicio.json()["progreso_porcentaje"], 0)
+
+        calendario = self.cliente.get(
+            "/rutas",
+            headers=self.encabezados_ciudadano,
+        )
+        ruta_visible = next(
+            item for item in calendario.json() if item["id"] == ruta_id
+        )
+        self.assertEqual(ruta_visible["operacion"]["estado"], "en_recorrido")
+        self.assertEqual(ruta_visible["operacion"]["latitud_actual"], 20.5990)
+
+        ubicacion = self.cliente.post(
+            f"/operacion/ejecuciones/{ejecucion_id}/ubicacion",
+            headers=self.encabezados,
+            json={
+                "latitud": 20.5993,
+                "longitud": -100.3328,
+                "precision_m": 3,
+            },
+        )
+        self.assertEqual(ubicacion.status_code, 200, ubicacion.text)
+        self.assertEqual(ubicacion.json()["latitud_actual"], 20.5993)
+
+        incidencia = self.cliente.post(
+            f"/operacion/ejecuciones/{ejecucion_id}/incidencias",
+            headers=self.encabezados,
+            json={
+                "parada_id": parada_id,
+                "tipo": "contenedor_bloqueado",
+                "comentario": "Un vehiculo bloquea el acceso al contenedor.",
+                "latitud": 20.5994,
+                "longitud": -100.3327,
+            },
+        )
+        self.assertEqual(incidencia.status_code, 201, incidencia.text)
+        self.assertEqual(incidencia.json()["paradas"][0]["estado"], "incidencia")
+        self.assertEqual(incidencia.json()["progreso_porcentaje"], 100)
+
+        incidencias_admin = self.cliente.get(
+            "/operacion/incidencias",
+            headers=self.encabezados_admin,
+        )
+        self.assertEqual(incidencias_admin.status_code, 200, incidencias_admin.text)
+        self.assertIn(
+            ejecucion_id,
+            [item["ejecucion_id"] for item in incidencias_admin.json()],
+        )
+
+        finalizacion = self.cliente.post(
+            f"/operacion/ejecuciones/{ejecucion_id}/finalizar",
+            headers=self.encabezados,
+        )
+        self.assertEqual(finalizacion.status_code, 200, finalizacion.text)
+        self.assertEqual(finalizacion.json()["estado"], "completada")
+
+        sin_activo = self.cliente.get(
+            "/operacion/mi-recorrido-activo",
+            headers=self.encabezados,
+        )
+        self.assertEqual(sin_activo.status_code, 200, sin_activo.text)
+        self.assertIsNone(sin_activo.json())
 
 
 if __name__ == "__main__":

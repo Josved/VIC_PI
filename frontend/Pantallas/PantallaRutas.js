@@ -12,6 +12,8 @@ import { CalendarClock, Check, MapPin, Pencil, Power, Route } from 'lucide-react
 import { Boton } from '../componentes/Boton';
 import { CampoTexto } from '../componentes/CampoTexto';
 import { conexionApi, obtenerMensajeErrorApi } from '../componentes/conexionApi';
+import { usarSesion } from '../componentes/ContextoSesion';
+import { PanelRecorrido } from '../componentes/PanelRecorrido';
 import { PantallaBase } from '../componentes/PantallaBase';
 import { colores, espaciado } from '../componentes/tema';
 import { usarContenedores } from '../componentes/usarContenedores';
@@ -37,6 +39,8 @@ const formularioInicial = {
 };
 
 export function PantallaRutas() {
+  const { usuario } = usarSesion();
+  const esAdmin = usuario?.rol === 'admin';
   const {
     contenedores,
     cargando: cargandoContenedores,
@@ -45,6 +49,8 @@ export function PantallaRutas() {
   const [formulario, cambiarFormulario] = useState(formularioInicial);
   const [contenedorIds, cambiarContenedorIds] = useState([]);
   const [rutas, cambiarRutas] = useState([]);
+  const [recolectores, cambiarRecolectores] = useState([]);
+  const [recolectorId, cambiarRecolectorId] = useState(null);
   const [rutaEditandoId, cambiarRutaEditandoId] = useState(null);
   const [cargandoRutas, cambiarCargandoRutas] = useState(true);
   const [guardando, cambiarGuardando] = useState(false);
@@ -56,8 +62,15 @@ export function PantallaRutas() {
     try {
       cambiarCargandoRutas(true);
       cambiarError('');
-      const respuesta = await conexionApi.get('/rutas/mias');
-      cambiarRutas(respuesta.data);
+      const solicitudes = [conexionApi.get('/rutas/mias')];
+      if (esAdmin) {
+        solicitudes.push(conexionApi.get('/administracion/recolectores'));
+      }
+      const [respuestaRutas, respuestaRecolectores] = await Promise.all(solicitudes);
+      cambiarRutas(respuestaRutas.data);
+      if (respuestaRecolectores) {
+        cambiarRecolectores(respuestaRecolectores.data);
+      }
     } catch (excepcion) {
       cambiarError(
         obtenerMensajeErrorApi(excepcion, 'No fue posible cargar las rutas.'),
@@ -65,7 +78,7 @@ export function PantallaRutas() {
     } finally {
       cambiarCargandoRutas(false);
     }
-  }, []);
+  }, [esAdmin]);
 
   useEffect(() => {
     cargarRutas();
@@ -86,6 +99,7 @@ export function PantallaRutas() {
   function limpiarFormulario() {
     cambiarFormulario(formularioInicial);
     cambiarContenedorIds([]);
+    cambiarRecolectorId(null);
     cambiarRutaEditandoId(null);
   }
 
@@ -98,6 +112,7 @@ export function PantallaRutas() {
       descripcion: ruta.descripcion || '',
     });
     cambiarContenedorIds(ruta.contenedores.map((contenedor) => contenedor.id));
+    cambiarRecolectorId(ruta.recolector?.id || null);
     cambiarRutaEditandoId(ruta.id);
     cambiarError('');
     cambiarExito('');
@@ -116,6 +131,10 @@ export function PantallaRutas() {
       cambiarError('Selecciona al menos un contenedor para la ruta.');
       return;
     }
+    if (esAdmin && !recolectorId) {
+      cambiarError('Selecciona el recolector responsable.');
+      return;
+    }
 
     const datos = {
       ...formulario,
@@ -123,6 +142,7 @@ export function PantallaRutas() {
       zona: formulario.zona.trim(),
       descripcion: formulario.descripcion.trim() || null,
       contenedor_ids: contenedorIds,
+      recolector_id: esAdmin ? recolectorId : undefined,
     };
 
     try {
@@ -176,6 +196,10 @@ export function PantallaRutas() {
           </Text>
         </View>
       </View>
+
+      {usuario?.rol === 'collector' ? (
+        <PanelRecorrido rutas={rutas} alActualizarRutas={cargarRutas} />
+      ) : null}
 
       <View style={estilos.tarjetaFormulario}>
         <View style={estilos.filaTitulo}>
@@ -241,6 +265,39 @@ export function PantallaRutas() {
           onChangeText={(valor) => cambiarCampo('descripcion', valor)}
           estilo={estilos.descripcion}
         />
+
+        {esAdmin ? (
+          <View style={estilos.campo}>
+            <Text style={estilos.etiqueta}>Recolector responsable</Text>
+            <Text style={estilos.ayuda}>
+              Solo el personal activo puede recibir una ruta.
+            </Text>
+            <View style={estilos.dias}>
+              {recolectores.map((recolector) => (
+                <Pressable
+                  accessibilityRole="button"
+                  key={recolector.id}
+                  onPress={() => cambiarRecolectorId(recolector.id)}
+                  style={[
+                    estilos.recolector,
+                    recolectorId === recolector.id &&
+                      estilos.recolectorSeleccionado,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      estilos.textoRecolector,
+                      recolectorId === recolector.id &&
+                        estilos.textoRecolectorSeleccionado,
+                    ]}
+                  >
+                    {recolector.nombre} {recolector.apellidos}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : null}
 
         <View style={estilos.campo}>
           <Text style={estilos.etiqueta}>Contenedores del recorrido</Text>
@@ -349,6 +406,18 @@ export function PantallaRutas() {
                 {ruta.contenedores.length === 1 ? 'contenedor' : 'contenedores'}
                 {ruta.descripcion ? ` · ${ruta.descripcion}` : ''}
               </Text>
+              <Text style={estilos.recolectorAsignado}>
+                Responsable:{' '}
+                {ruta.recolector
+                  ? `${ruta.recolector.nombre} ${ruta.recolector.apellidos}`
+                  : 'Sin asignar'}
+              </Text>
+              {ruta.operacion ? (
+                <Text style={estilos.operacion}>
+                  Último recorrido: {ruta.operacion.estado} ·{' '}
+                  {ruta.operacion.progreso_porcentaje}%
+                </Text>
+              ) : null}
               <View style={estilos.accionesRuta}>
                 <Pressable
                   accessibilityRole="button"
@@ -441,6 +510,20 @@ const estilos = StyleSheet.create({
   },
   textoDia: { color: colores.text, fontSize: 12, fontWeight: '800' },
   textoDiaSeleccionado: { color: colores.white },
+  recolector: {
+    paddingHorizontal: espaciado.md,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: colores.border,
+    borderRadius: 12,
+    backgroundColor: colores.white,
+  },
+  recolectorSeleccionado: {
+    borderColor: colores.primary,
+    backgroundColor: colores.primary,
+  },
+  textoRecolector: { color: colores.text, fontSize: 12, fontWeight: '800' },
+  textoRecolectorSeleccionado: { color: colores.white },
   descripcion: {
     minHeight: 82,
     paddingTop: espaciado.md,
@@ -530,6 +613,12 @@ const estilos = StyleSheet.create({
     fontWeight: '800',
   },
   rutaDetalle: { color: colores.muted, fontSize: 13, lineHeight: 19 },
+  recolectorAsignado: {
+    color: colores.primaryDark,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  operacion: { color: '#1769AA', fontSize: 12, fontWeight: '800' },
   estado: {
     paddingHorizontal: espaciado.sm,
     paddingVertical: 5,

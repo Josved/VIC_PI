@@ -18,12 +18,15 @@ administradas por recolectores. Los avisos todavía son datos locales.
 - Consultar el usuario autenticado mediante la API.
 - Cerrar sesión.
 - Solicitar recuperación de contraseña.
+- Cambiar la contraseña desde Perfil.
+- Bloquear inmediatamente cuentas suspendidas.
 
 La solicitud de recuperación sólo devuelve una confirmación. Todavía no genera
 un token, no envía correo y no cambia la contraseña.
 
-Los perfiles recolector y administrador deben ser asignados de forma controlada;
-todavía no existe una pantalla administrativa para cambiar roles.
+Los perfiles recolector y administrador se asignan desde una pantalla exclusiva
+para Admin. Las cuentas nuevas reciben una contraseña temporal y quedan marcadas
+para cambiarla.
 
 ### Inicio y comunidad
 
@@ -52,6 +55,19 @@ Todavía no existen tablas ni endpoints para administrar avisos.
 - Editar, activar o pausar rutas.
 - Limitar la gestión a recolectores y administradores.
 - Permitir que los ciudadanos consulten únicamente las rutas activas.
+- Asignar un recolector responsable a cada ruta.
+- Iniciar y finalizar recorridos con una copia ordenada de sus paradas.
+- Compartir GPS durante el recorrido.
+- Marcar paradas como recolectadas, omitidas o con incidencia.
+- Mostrar al ciudadano estado, progreso y ubicación del recorrido.
+
+### Administración
+
+- Crear cuentas autorizadas de ciudadano, recolector o administrador.
+- Cambiar roles.
+- Suspender y reactivar cuentas.
+- Restablecer contraseñas temporales.
+- Consultar incidencias operativas.
 
 ### Reportes
 
@@ -76,6 +92,7 @@ Todavía no existen tablas ni endpoints para administrar avisos.
 - `POST /autenticacion/recuperar-contrasena`: confirmación simulada.
 - `POST /autenticacion/restablecer-contrasena`: endpoint simulado.
 - `GET /autenticacion/mi-usuario`: devuelve el usuario del JWT.
+- `POST /autenticacion/cambiar-contrasena`: cambia la contraseña autenticada.
 - `POST /contenedores/registrar-qr`: alta o actualización por QR y GPS.
 - `GET /contenedores/cercanos`: consulta autenticada por radio y distancia.
 - `GET /contenedores`: lista autenticada.
@@ -88,6 +105,20 @@ Todavía no existen tablas ni endpoints para administrar avisos.
 - `GET /rutas/mias`: rutas gestionables por recolector o administrador.
 - `POST /rutas`: crea una ruta semanal.
 - `PATCH /rutas/{id}`: edita, activa o pausa una ruta autorizada.
+- `GET /administracion/usuarios`: lista cuentas para Admin.
+- `POST /administracion/usuarios`: crea una cuenta autorizada.
+- `PATCH /administracion/usuarios/{id}`: cambia rol o estado.
+- `POST /administracion/usuarios/{id}/restablecer-contrasena`: crea una clave
+  temporal.
+- `GET /administracion/recolectores`: lista recolectores activos.
+- `GET /operacion/mi-recorrido-activo`: recorrido actual del recolector.
+- `POST /operacion/rutas/{id}/iniciar`: inicia recorrido y GPS.
+- `POST /operacion/ejecuciones/{id}/ubicacion`: guarda posición en vivo.
+- `PATCH /operacion/ejecuciones/{id}/paradas/{parada_id}`: atiende una parada.
+- `POST /operacion/ejecuciones/{id}/incidencias`: registra una incidencia.
+- `POST /operacion/ejecuciones/{id}/finalizar`: completa el recorrido.
+- `POST /operacion/ejecuciones/{id}/cancelar`: cancela con motivo.
+- `GET /operacion/incidencias`: consulta incidencias autorizadas.
 - `GET /docs`: documentación Swagger.
 
 ## Base de datos
@@ -121,12 +152,17 @@ La tabla de identidad es `usuarios`:
 - `rutas_recoleccion`: nombre, zona, día, hora, estado, creador y marcas de
   tiempo.
 - `rutas_contenedores`: relación ordenada de contenedores por ruta.
+- `control_usuarios`: activación y cambio obligatorio de contraseña.
+- `asignaciones_ruta`: recolector responsable de cada ruta.
+- `ejecuciones_ruta`: recorrido real, estado y última posición.
+- `paradas_ejecucion_ruta`: resultado de cada contenedor del recorrido.
+- `ubicaciones_ejecucion_ruta`: historial GPS del recolector.
+- `incidencias_operativas`: problemas encontrados durante el servicio.
 
 No existen todavía tablas para avisos, archivos o tokens de recuperación.
 
 ## Limitaciones antes de considerarlo completo
 
-- Implementar una pantalla administrativa para asignar roles.
 - Añadir almacenamiento real de archivos; por ahora la evidencia es una URL.
 - Implementar avisos desde el backend.
 - Implementar recuperación real de contraseña.
@@ -144,4 +180,5 @@ No existen todavía tablas para avisos, archivos o tokens de recuperación.
 - Compilación web de Expo y servicio estático con Nginx.
 - Proxy `/api` para que el navegador y la API compartan origen.
 - Puerto directo de API para pruebas con Expo Go en la LAN.
-- Pruebas automatizadas de QR ciudadano, GPS, reportes, rutas y permisos por rol.
+- Nueve pruebas automatizadas de QR ciudadano, administración, suspensión de
+  cuentas, GPS, reportes, rutas, recorridos, incidencias y permisos por rol.

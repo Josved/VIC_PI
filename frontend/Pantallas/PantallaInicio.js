@@ -12,6 +12,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { CalendarDays, Clock3, MapPin, RefreshCw, Route } from 'lucide-react-native';
 
 import { conexionApi, obtenerMensajeErrorApi } from '../componentes/conexionApi';
+import { MapaRuta } from '../componentes/MapaRuta';
 import { PantallaBase } from '../componentes/PantallaBase';
 import { colores, espaciado } from '../componentes/tema';
 
@@ -42,6 +43,12 @@ const diasSemana = [
   { id: 'domingo', nombre: 'Domingo', corto: 'Dom' },
 ];
 
+const etiquetasOperacion = {
+  en_recorrido: 'Recolector en recorrido',
+  completada: 'Recolección completada',
+  cancelada: 'Ruta cancelada',
+};
+
 export function PantallaInicio() {
   const [rutas, cambiarRutas] = useState([]);
   const [cargando, cambiarCargando] = useState(true);
@@ -69,6 +76,8 @@ export function PantallaInicio() {
   useFocusEffect(
     useCallback(() => {
       cargarRutas();
+      const intervalo = setInterval(cargarRutas, 15000);
+      return () => clearInterval(intervalo);
     }, [cargarRutas]),
   );
 
@@ -226,6 +235,41 @@ export function PantallaInicio() {
                           ? 'contenedor incluido'
                           : 'contenedores incluidos'}
                       </Text>
+                      {ruta.recolector ? (
+                        <Text style={estilos.recolectorRuta}>
+                          Responsable: {ruta.recolector.nombre}{' '}
+                          {ruta.recolector.apellidos}
+                        </Text>
+                      ) : null}
+                      {ruta.operacion ? (
+                        <View style={estilos.estadoOperacion}>
+                          <Text style={estilos.textoEstadoOperacion}>
+                            {etiquetasOperacion[ruta.operacion.estado]}
+                          </Text>
+                          <Text style={estilos.progresoOperacion}>
+                            {ruta.operacion.progreso_porcentaje}% ·{' '}
+                            {ruta.operacion.paradas_atendidas}/
+                            {ruta.operacion.paradas_totales} paradas
+                          </Text>
+                        </View>
+                      ) : null}
+                      {ruta.operacion?.estado === 'en_recorrido' ? (
+                        <MapaRuta
+                          paradas={ruta.contenedores.map((contenedor) => ({
+                            ...contenedor,
+                            estado: 'pendiente',
+                          }))}
+                          ubicacionRecolector={
+                            ruta.operacion.latitud_actual != null
+                              && ruta.operacion.longitud_actual != null
+                              ? {
+                                  latitude: ruta.operacion.latitud_actual,
+                                  longitude: ruta.operacion.longitud_actual,
+                                }
+                              : null
+                          }
+                        />
+                      ) : null}
                       {ruta.descripcion ? (
                         <Text style={estilos.descripcionRuta}>{ruta.descripcion}</Text>
                       ) : null}
@@ -389,6 +433,15 @@ const estilos = StyleSheet.create({
   datoRuta: { flexDirection: 'row', alignItems: 'center', gap: espaciado.sm },
   textoDatoRuta: { flex: 1, color: colores.text, fontSize: 14, fontWeight: '700' },
   contenedoresRuta: { color: colores.primaryDark, fontSize: 12, fontWeight: '800' },
+  recolectorRuta: { color: colores.text, fontSize: 12, fontWeight: '800' },
+  estadoOperacion: {
+    gap: 3,
+    padding: espaciado.sm,
+    borderRadius: 10,
+    backgroundColor: '#E8F3FC',
+  },
+  textoEstadoOperacion: { color: '#1769AA', fontSize: 13, fontWeight: '900' },
+  progresoOperacion: { color: '#1769AA', fontSize: 11, fontWeight: '700' },
   descripcionRuta: { color: colores.muted, fontSize: 13, lineHeight: 18 },
   notaModal: {
     marginTop: espaciado.lg,

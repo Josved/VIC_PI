@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from .base_datos import obtener_base_datos
 from .esquemas import (
+    CambiarContrasenaEntrada,
     InicioSesionEntrada,
     RecuperarContrasenaEntrada,
     RegistroEntrada,
@@ -12,17 +13,44 @@ from .esquemas import (
     SesionRespuesta,
     UsuarioRespuesta,
 )
-from .modelos import Usuario
+from .modelos import ControlUsuario, Usuario, ahora_utc
 from .seguridad import cifrar_contrasena, crear_token_acceso, leer_token_acceso, verificar_contrasena
 
 enrutador = APIRouter(prefix="/autenticacion", tags=["autenticacion"])
 seguridad_bearer = HTTPBearer()
 
 
-def crear_sesion(usuario: Usuario) -> SesionRespuesta:
+def obtener_control_usuario(
+    base_datos: Session,
+    usuario_id: int,
+) -> ControlUsuario | None:
+    return base_datos.get(ControlUsuario, usuario_id)
+
+
+def crear_usuario_respuesta(
+    usuario: Usuario,
+    control: ControlUsuario | None = None,
+) -> UsuarioRespuesta:
+    return UsuarioRespuesta(
+        id=usuario.id,
+        nombre=usuario.nombre,
+        apellidos=usuario.apellidos,
+        correo=usuario.correo,
+        rol=usuario.rol,
+        activo=control.activo if control else True,
+        requiere_cambio_contrasena=(
+            control.requiere_cambio_contrasena if control else False
+        ),
+        creado_en=usuario.creado_en,
+        actualizado_en=usuario.actualizado_en,
+    )
+
+
+def crear_sesion(usuario: Usuario, base_datos: Session) -> SesionRespuesta:
+    control = obtener_control_usuario(base_datos, usuario.id)
     return SesionRespuesta(
         token_acceso=crear_token_acceso(str(usuario.id)),
-        usuario=UsuarioRespuesta.model_validate(usuario),
+        usuario=crear_usuario_respuesta(usuario, control),
     )
 
 
@@ -37,6 +65,13 @@ def obtener_usuario_actual(
     usuario = base_datos.get(Usuario, int(id_usuario))
     if not usuario:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario no encontrado")
+
+    control = obtener_control_usuario(base_datos, usuario.id)
+    if control and not control.activo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="La cuenta esta suspendida. Contacta al administrador",
+        )
 
     return usuario
 
@@ -55,9 +90,17 @@ def registrar_usuario(datos: RegistroEntrada, base_datos: Session = Depends(obte
         rol="citizen",
     )
     base_datos.add(usuario)
+    base_datos.flush()
+    base_datos.add(
+        ControlUsuario(
+            usuario_id=usuario.id,
+            activo=True,
+            requiere_cambio_contrasena=False,
+        ),
+    )
     base_datos.commit()
     base_datos.refresh(usuario)
-    return crear_sesion(usuario)
+    return crear_sesion(usuario, base_datos)
 
 
 @enrutador.post("/iniciar-sesion", response_model=SesionRespuesta)
@@ -66,7 +109,14 @@ def iniciar_sesion(datos: InicioSesionEntrada, base_datos: Session = Depends(obt
     if not usuario or not verificar_contrasena(datos.contrasena, usuario.contrasena_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales invalidas")
 
-    return crear_sesion(usuario)
+    control = obtener_control_usuario(base_datos, usuario.id)
+    if control and not control.activo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="La cuenta esta suspendida. Contacta al administrador",
+        )
+
+    return crear_sesion(usuario, base_datos)
 
 
 @enrutador.post("/recuperar-contrasena")
@@ -80,5 +130,44 @@ def restablecer_contrasena(datos: RestablecerContrasenaEntrada):
 
 
 @enrutador.get("/mi-usuario", response_model=UsuarioRespuesta)
-def obtener_mi_usuario(usuario_actual: Usuario = Depends(obtener_usuario_actual)):
-    return usuario_actual
+def obtener_mi_usuario(
+    usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    base_datos: Session = Depends(obtener_base_datos),
+):
+    return crear_usuario_respuesta(
+        usuario_actual,
+        obtener_control_usuario(base_datos, usuario_actual.id),
+    )
+
+
+@enrutador.post("/cambiar-contrasena")
+def cambiar_contrasena(
+    datos: CambiarContrasenaEntrada,
+    usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    base_datos: Session = Depends(obtener_base_datos),
+):
+    if not verificar_contrasena(
+        datos.contrasena_actual,
+        usuario_actual.contrasena_hash,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La contrasena actual no es correcta",
+        )
+
+    usuario_actual.contrasena_hash = cifrar_contrasena(datos.contrasena_nueva)
+    usuario_actual.actualizado_en = ahora_utc()
+    control = obtener_control_usuario(base_datos, usuario_actual.id)
+    if control:
+        control.requiere_cambio_contrasena = False
+        control.actualizado_en = ahora_utc()
+    else:
+        base_datos.add(
+            ControlUsuario(
+                usuario_id=usuario_actual.id,
+                activo=True,
+                requiere_cambio_contrasena=False,
+            ),
+        )
+    base_datos.commit()
+    return {"mensaje": "Contrasena actualizada correctamente"}
