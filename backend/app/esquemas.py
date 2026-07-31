@@ -135,6 +135,7 @@ class ReporteRespuesta(BaseModel):
     motivo: MotivoReporte
     comentario: str | None
     evidencia_url: str | None
+    respuesta: str | None
     estado: EstadoReporte
     creado_en: datetime
     actualizado_en: datetime
@@ -144,6 +145,7 @@ class ReporteRespuesta(BaseModel):
 
 class ReporteActualizarEstado(BaseModel):
     estado: EstadoReporte
+    respuesta: str | None = Field(default=None, max_length=1000)
 
 
 class CambiarContrasenaEntrada(BaseModel):

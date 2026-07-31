@@ -75,6 +75,7 @@ export function PantallaReportes() {
   const [cargandoReportes, cambiarCargandoReportes] = useState(true);
   const [errorReportes, cambiarErrorReportes] = useState('');
   const [actualizandoId, cambiarActualizandoId] = useState(null);
+  const [respuestas, cambiarRespuestas] = useState({});
 
   const contenedoresFiltrados = useMemo(() => {
     const texto = busquedaCodigo.trim().toLowerCase();
@@ -174,10 +175,31 @@ export function PantallaReportes() {
   }
 
   async function actualizarEstado(reporteId, estado) {
+    if (!esGestor) {
+      cambiarErrorReportes('Solo recolectores y administradores pueden atender reportes.');
+      return;
+    }
+
+    const reporteActual = reportes.find((reporte) => reporte.id === reporteId);
+    const respuesta =
+      respuestas[reporteId]?.trim() || reporteActual?.respuesta?.trim() || '';
+    if (estado === 'resuelto' && !respuesta) {
+      cambiarErrorReportes('Escribe una respuesta para el ciudadano antes de resolver el reporte.');
+      return;
+    }
+
     try {
       cambiarActualizandoId(reporteId);
       cambiarErrorReportes('');
-      await conexionApi.patch(`/reportes/${reporteId}/estado`, { estado });
+      await conexionApi.patch(`/reportes/${reporteId}/estado`, {
+        estado,
+        respuesta: respuesta || null,
+      });
+      cambiarRespuestas((actuales) => {
+        const siguientes = { ...actuales };
+        delete siguientes[reporteId];
+        return siguientes;
+      });
       await cargarReportes();
     } catch (excepcion) {
       cambiarErrorReportes(
@@ -418,34 +440,66 @@ export function PantallaReportes() {
                     </Text>
                   </View>
 
-                  {reporte.comentario ? (
-                    <Text style={estilos.comentarioReporte}>
-                      {reporte.comentario}
+                  <View style={estilos.detalleReporte}>
+                    <Text style={estilos.etiquetaDetalle}>
+                      {esGestor ? 'Comentario del ciudadano' : 'Lo que escribiste'}
                     </Text>
+                    <Text style={estilos.comentarioReporte}>
+                      {reporte.comentario || 'Sin comentario adicional.'}
+                    </Text>
+                  </View>
+
+                  {!esGestor || reporte.respuesta ? (
+                    <View style={estilos.respuestaReporte}>
+                      <Text style={estilos.etiquetaRespuesta}>Respuesta del equipo</Text>
+                      <Text style={estilos.textoRespuesta}>
+                        {reporte.respuesta
+                          || (reporte.estado === 'pendiente'
+                            ? 'Tu reporte está pendiente de revisión.'
+                            : reporte.estado === 'en_revision'
+                              ? 'El equipo está revisando tu reporte y responderá aquí.'
+                              : 'Este reporte se marcó como resuelto antes de habilitar las respuestas.')}
+                      </Text>
+                    </View>
                   ) : null}
 
                   {esGestor && reporte.estado !== 'resuelto' ? (
-                    <View style={estilos.accionesReporte}>
-                      {reporte.estado === 'pendiente' ? (
+                    <View style={estilos.gestionReporte}>
+                      <CampoTexto
+                        etiqueta="Respuesta para el ciudadano"
+                        value={respuestas[reporte.id] ?? reporte.respuesta ?? ''}
+                        onChangeText={(valor) =>
+                          cambiarRespuestas((actuales) => ({
+                            ...actuales,
+                            [reporte.id]: valor,
+                          }))
+                        }
+                        placeholder="Explica qué se hizo o cómo se resolverá"
+                        maxLength={1000}
+                        multiline
+                      />
+                      <View style={estilos.accionesReporte}>
+                        {reporte.estado === 'pendiente' ? (
+                          <View style={estilos.accionReporte}>
+                            <Boton
+                              texto="Tomar"
+                              variante="secundario"
+                              cargando={actualizandoId === reporte.id}
+                              alPresionar={() =>
+                                actualizarEstado(reporte.id, 'en_revision')
+                              }
+                            />
+                          </View>
+                        ) : null}
                         <View style={estilos.accionReporte}>
                           <Boton
-                            texto="Tomar"
-                            variante="secundario"
+                            texto="Responder y resolver"
                             cargando={actualizandoId === reporte.id}
                             alPresionar={() =>
-                              actualizarEstado(reporte.id, 'en_revision')
+                              actualizarEstado(reporte.id, 'resuelto')
                             }
                           />
                         </View>
-                      ) : null}
-                      <View style={estilos.accionReporte}>
-                        <Boton
-                          texto="Resolver"
-                          cargando={actualizandoId === reporte.id}
-                          alPresionar={() =>
-                            actualizarEstado(reporte.id, 'resuelto')
-                          }
-                        />
                       </View>
                     </View>
                   ) : null}
@@ -669,10 +723,23 @@ const estilos = StyleSheet.create({
     color: colores.text,
     fontSize: 13,
     lineHeight: 19,
+  },
+  detalleReporte: {
+    gap: 4,
     paddingTop: espaciado.sm,
     borderTopWidth: 1,
     borderTopColor: colores.border,
   },
+  etiquetaDetalle: { color: colores.muted, fontSize: 11, fontWeight: '800' },
+  respuestaReporte: {
+    gap: 4,
+    padding: espaciado.md,
+    borderRadius: 12,
+    backgroundColor: '#EAF7EE',
+  },
+  etiquetaRespuesta: { color: colores.primary, fontSize: 12, fontWeight: '900' },
+  textoRespuesta: { color: colores.text, fontSize: 13, lineHeight: 19 },
+  gestionReporte: { gap: espaciado.sm },
   accionesReporte: {
     flexDirection: 'row',
     gap: espaciado.sm,

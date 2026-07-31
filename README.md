@@ -92,8 +92,10 @@ La evidencia automatizada y las pruebas físicas pendientes están separadas en
 - Los registros públicos siempre crean un perfil `citizen`.
 - Todo usuario autenticado puede registrar o actualizar la ubicación de un
   contenedor por QR y enviar reportes.
-- `collector` y `admin` pueden consultar todos los reportes y cambiar su estado
-  entre pendiente, en revisión y resuelto.
+- `collector` y `admin` pueden consultar todos los reportes, tomarlos y
+  resolverlos con una respuesta obligatoria para el ciudadano.
+- Los ciudadanos solo consultan sus propios reportes, lo que escribieron, su
+  estado y la respuesta del equipo; no pueden atenderlos ni cambiar su estado.
 - La pantalla Reportes permite seleccionar un contenedor por QR o por búsqueda,
   enviar motivo, comentario y enlace de evidencia, y consultar el seguimiento.
 

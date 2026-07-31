@@ -13,6 +13,7 @@ from .base_datos import Base, SesionLocal, motor_base_datos
 from .configuracion import configuracion
 from .contenedores import enrutador as enrutador_contenedores
 from .geografia import enrutador as enrutador_geografia
+from .migraciones import migrar_esquema
 from .reportes import enrutador as enrutador_reportes
 from .rutas import (
     enrutador as enrutador_rutas,
@@ -21,6 +22,7 @@ from .rutas import (
 from .operacion import enrutador as enrutador_operacion
 
 Base.metadata.create_all(bind=motor_base_datos)
+migrar_esquema(motor_base_datos)
 with SesionLocal() as base_datos:
     inicializar_rutas_sin_configuracion(base_datos)
 

@@ -21,7 +21,13 @@ export function ProveedorSesion({ children }) {
             throw new Error('Sesión guardada incompleta');
           }
           guardarTokenAutorizacion(sesionGuardada.token_acceso);
-          cambiarSesion(sesionGuardada);
+          const respuesta = await conexionApi.get('/autenticacion/mi-usuario');
+          const sesionActualizada = {
+            ...sesionGuardada,
+            usuario: respuesta.data,
+          };
+          cambiarSesion(sesionActualizada);
+          await AsyncStorage.setItem(CLAVE_SESION, JSON.stringify(sesionActualizada));
         }
       } catch {
         guardarTokenAutorizacion(null);
