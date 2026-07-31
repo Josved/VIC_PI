@@ -1,7 +1,6 @@
 import NetInfo from '@react-native-community/netinfo';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import * as Notifications from 'expo-notifications';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -30,6 +29,7 @@ import { ejecutarConRespaldo, sincronizarCola } from './colaOffline';
 import { conexionApi, obtenerMensajeErrorApi } from './conexionApi';
 import { usarSesion } from './ContextoSesion';
 import { MapaRuta } from './MapaRuta';
+import { mostrarNotificacionLocal } from './servicioNotificaciones';
 import {
   detenerRastreoSegundoPlano,
   iniciarRastreoSegundoPlano,
@@ -177,12 +177,9 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
       'Llegaste a la parada',
       `Estás a ${Math.round(distanciaSiguiente)} m de ${siguienteParada.codigo_qr}.`,
     );
-    Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Llegaste a la siguiente parada',
-        body: siguienteParada.direccion || siguienteParada.codigo_qr,
-      },
-      trigger: null,
+    mostrarNotificacionLocal({
+      titulo: 'Llegaste a la siguiente parada',
+      cuerpo: siguienteParada.direccion || siguienteParada.codigo_qr,
     }).catch(() => null);
   }, [distanciaSiguiente, siguienteParada?.id]);
 

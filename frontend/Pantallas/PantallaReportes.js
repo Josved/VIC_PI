@@ -64,7 +64,6 @@ export function PantallaReportes() {
   const [contenedorId, cambiarContenedorId] = useState(null);
   const [motivo, cambiarMotivo] = useState(null);
   const [comentario, cambiarComentario] = useState('');
-  const [evidenciaUrl, cambiarEvidenciaUrl] = useState('');
   const [enviando, cambiarEnviando] = useState(false);
   const [errorFormulario, cambiarErrorFormulario] = useState('');
   const [exito, cambiarExito] = useState('');
@@ -120,7 +119,6 @@ export function PantallaReportes() {
     cambiarContenedorId(null);
     cambiarMotivo(null);
     cambiarComentario('');
-    cambiarEvidenciaUrl('');
   }
 
   async function manejarCodigoEscaneado(codigoQr) {
@@ -160,7 +158,6 @@ export function PantallaReportes() {
         contenedor_id: contenedorId,
         motivo,
         comentario: comentario.trim() || null,
-        evidencia_url: evidenciaUrl.trim() || null,
       });
       cambiarExito('Reporte enviado. El equipo ya puede darle seguimiento.');
       reiniciarFormulario();
@@ -352,14 +349,6 @@ export function PantallaReportes() {
             onChangeText={cambiarComentario}
             maxLength={500}
             multiline
-          />
-          <CampoTexto
-            etiqueta="Enlace de evidencia (opcional)"
-            value={evidenciaUrl}
-            onChangeText={cambiarEvidenciaUrl}
-            autoCapitalize="none"
-            keyboardType="url"
-            maxLength={300}
           />
         </View>
 

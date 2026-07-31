@@ -29,7 +29,6 @@ def crear_reporte(
         usuario_id=usuario_actual.id,
         motivo=datos.motivo,
         comentario=datos.comentario,
-        evidencia_url=datos.evidencia_url,
     )
     base_datos.add(reporte)
     base_datos.commit()

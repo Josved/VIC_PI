@@ -97,7 +97,7 @@ La evidencia automatizada y las pruebas físicas pendientes están separadas en
 - Los ciudadanos solo consultan sus propios reportes, lo que escribieron, su
   estado y la respuesta del equipo; no pueden atenderlos ni cambiar su estado.
 - La pantalla Reportes permite seleccionar un contenedor por QR o por búsqueda,
-  enviar motivo, comentario y enlace de evidencia, y consultar el seguimiento.
+  enviar motivo y comentario, y consultar el seguimiento.
 
 ## Rutas y calendario semanal
 
@@ -139,8 +139,10 @@ La evidencia automatizada y las pruebas físicas pendientes están separadas en
   temporalmente sin conexión y sincronizar acciones al recuperar la red.
 - El GPS en segundo plano está preparado para una compilación de desarrollo o
   producción; Expo Go mantiene el rastreo únicamente en primer plano.
-- El ciudadano recibe avisos locales, ETA, distancia, placa, avance y ubicación
-  del recorrido.
+- El ciudadano recibe ETA, distancia, placa, avance y ubicación del recorrido.
+- Expo Go muestra los avisos dentro de la aplicación sin cargar el módulo push;
+  las notificaciones del sistema se activan en compilaciones de desarrollo o
+  producción, porque Android dejó de admitir push remoto en Expo Go desde SDK 53.
 
 El backend usa el servicio público de OSRM por defecto. Para operar el motor
 vial completamente dentro de la LAN, consultar

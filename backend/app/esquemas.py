@@ -125,7 +125,6 @@ class ReporteCrear(BaseModel):
     contenedor_id: int = Field(gt=0)
     motivo: MotivoReporte
     comentario: str | None = Field(default=None, max_length=500)
-    evidencia_url: str | None = Field(default=None, max_length=300)
 
 
 class ReporteRespuesta(BaseModel):

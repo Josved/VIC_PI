@@ -1,9 +1,7 @@
-import * as Notifications from 'expo-notifications';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +14,10 @@ import { CalendarDays, Clock3, MapPin, RefreshCw, Route } from 'lucide-react-nat
 import { conexionApi, obtenerMensajeErrorApi } from '../componentes/conexionApi';
 import { MapaRuta } from '../componentes/MapaRuta';
 import { PantallaBase } from '../componentes/PantallaBase';
+import {
+  mostrarNotificacionLocal,
+  prepararNotificacionesLocales,
+} from '../componentes/servicioNotificaciones';
 import { colores, espaciado } from '../componentes/tema';
 
 const avisos = [
@@ -51,17 +53,6 @@ const etiquetasOperacion = {
   cancelada: 'Ruta cancelada',
 };
 
-if (Platform.OS !== 'web') {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: false,
-      shouldSetBadge: false,
-    }),
-  });
-}
-
 export function PantallaInicio() {
   const [rutas, cambiarRutas] = useState([]);
   const [cargando, cambiarCargando] = useState(true);
@@ -70,18 +61,7 @@ export function PantallaInicio() {
   const estadosAnteriores = useRef(null);
 
   useEffect(() => {
-    if (Platform.OS === 'web') return;
-    Notifications.getPermissionsAsync()
-      .then((permiso) =>
-        permiso.granted ? permiso : Notifications.requestPermissionsAsync(),
-      )
-      .catch(() => null);
-    if (Platform.OS === 'android') {
-      Notifications.setNotificationChannelAsync('default', {
-        name: 'Avisos de recolección',
-        importance: Notifications.AndroidImportance.DEFAULT,
-      }).catch(() => null);
-    }
+    prepararNotificacionesLocales().catch(() => null);
   }, []);
 
   const cargarRutas = useCallback(async () => {
@@ -122,12 +102,9 @@ export function PantallaInicio() {
           && anterior !== 'en_recorrido'
           && ruta.operacion?.estado === 'en_recorrido'
         ) {
-          Notifications.scheduleNotificationAsync({
-            content: {
-              title: 'El recolector inició su recorrido',
-              body: `${ruta.nombre}: paso aproximado ${ruta.hora_aproximada}.`,
-            },
-            trigger: null,
+          mostrarNotificacionLocal({
+            titulo: 'El recolector inició su recorrido',
+            cuerpo: `${ruta.nombre}: paso aproximado ${ruta.hora_aproximada}.`,
           }).catch(() => null);
         }
       });
