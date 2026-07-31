@@ -107,7 +107,8 @@ La evidencia automatizada y las pruebas físicas pendientes están separadas en
   contenedores.
 - Los ciudadanos consultan las rutas activas desde Inicio.
 - Los días con recolección aparecen en verde y abren un detalle con horario,
-  zona y cantidad de contenedores.
+  zona, cantidad de contenedores y un mapa desplegable del recorrido sobre
+  calles reales.
 - El administrador asigna cada ruta a un recolector activo.
 - El recolector inicia el recorrido, comparte GPS, atiende u omite paradas,
   registra incidencias y finaliza o cancela el servicio.
