@@ -132,7 +132,7 @@ export function PantallaReportes() {
 
     if (!encontrado) {
       cambiarErrorEscaneo(
-        'El QR no corresponde a un contenedor registrado. Un recolector o administrador debe registrarlo primero desde el mapa.',
+        'El QR no corresponde a un contenedor registrado. Puedes registrarlo primero desde el mapa y volver a reportarlo.',
       );
       return;
     }

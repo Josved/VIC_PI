@@ -147,7 +147,9 @@ Pantallas:
 Estado actual del modulo 2:
 
 - Integrado en `frontend/Pantallas/PantallaInicio.js` con la propuesta de Toño.
-- Incluye bienvenida, anuncios, calendario semanal y detalle de dia en modal.
+- Incluye bienvenida, anuncios, calendario semanal dinámico y detalle de día
+  en modal.
+- Consulta rutas activas desde la API y marca en verde los días de recolección.
 
 ### Modulo 3: Contenedores y mapa
 
@@ -167,7 +169,8 @@ Estado actual del modulo 3:
 - Incluye lista de contenedores.
 - Incluye detalle del contenedor seleccionado.
 - Incluye estado de ubicacion/permisos y contenedores cercanos.
-- Los datos actuales son locales de ejemplo para documentar y demostrar la interfaz.
+- Los datos se consultan desde la API y cualquier usuario autenticado puede
+  registrar o actualizar la ubicación de un contenedor mediante QR y GPS.
 
 ### Modulo 4: Reportes de contenedor
 
@@ -179,6 +182,19 @@ Pantallas:
 - Escanear QR
 - Captura manual de numero de serie
 - Formulario de reporte con motivo, evidencia y confirmacion
+
+Estado actual del modulo 4:
+
+- Implementado en `frontend/Pantallas/PantallaReportes.js`.
+- Ciudadanos consultan sus reportes; recolectores y administradores consultan
+  todos y actualizan su estado.
+
+### Modulo 5: Rutas de recoleccion
+
+- Implementado en `frontend/Pantallas/PantallaRutas.js`.
+- Recolectores y administradores crean y editan rutas semanales con día, hora,
+  zona y contenedores ordenados.
+- Las rutas activas alimentan el calendario del ciudadano.
 
 ## Reglas de trabajo
 
@@ -216,8 +232,8 @@ Carpeta principal: `backend/app`
 
 - `principal.py`: crea la aplicacion, CORS, rutas y tablas.
 - `autenticacion.py`: endpoints de autenticacion.
-- `modelos.py`: modelo SQLAlchemy `Usuario`.
-- `esquemas.py`: esquemas Pydantic.
+- `modelos.py`: usuarios, contenedores, historial GPS, reportes y rutas.
+- `esquemas.py`: contratos Pydantic de autenticación, contenedores, reportes y rutas.
 - `seguridad.py`: hash de contrasena y JWT.
 - `base_datos.py`: motor SQLite y sesiones.
 - `configuracion.py`: configuracion basica.
@@ -237,7 +253,8 @@ La base local `backend/vic.db` se genera automaticamente y NO debe subirse a Git
 - Backend FastAPI base agregado con endpoints de autenticacion.
 - Modulo 2 integrado en `frontend/Pantallas/PantallaInicio.js`.
 - Modulo 3 implementado en `frontend/Pantallas/PantallaContenedores.js`.
-- Modulo 4 sigue como pantalla base.
+- Modulo 4 de reportes implementado.
+- Modulo 5 de rutas semanales implementado.
 - Frontend y backend probados en web.
 - `npm run typecheck` pasa correctamente.
 
@@ -259,7 +276,7 @@ Se valido:
 - Reemplazar `LogoVIC` temporal por el archivo oficial del logo si el equipo entrega el PNG/SVG.
 - Implementar recuperacion real de contrasena con token, expiracion y envio de correo si el alcance lo exige.
 - Probar en Expo Go fisico antes de entrega final, sobre todo si despues se agregan camara, QR, ubicacion o mapa.
-- Agregar pruebas automatizadas si el profesor/equipo las solicita.
+- Mantener las pruebas automatizadas al agregar nuevas funciones.
 - Crear documentacion final de capturas para Zeroheight cuando el flujo definitivo este cerrado.
 
 ## Checklist antes de commit

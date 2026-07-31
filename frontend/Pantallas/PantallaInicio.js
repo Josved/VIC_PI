@@ -1,54 +1,180 @@
-import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { CalendarDays, Clock3, MapPin, RefreshCw, Route } from 'lucide-react-native';
 
+import { conexionApi, obtenerMensajeErrorApi } from '../componentes/conexionApi';
 import { PantallaBase } from '../componentes/PantallaBase';
 import { colores, espaciado } from '../componentes/tema';
 
 const avisos = [
   {
     id: '1',
-    titulo: 'Nuevo contenedor en el centro',
-    fecha: 'Hoy, 10:00 AM',
-    descripcion: 'Se ha instalado un nuevo punto verde en la plaza principal.',
+    titulo: 'Registro comunitario por QR',
+    fecha: 'Disponible',
+    descripcion:
+      'Si encuentras un contenedor, escanea su QR para registrar o actualizar su ubicación.',
   },
   {
     id: '2',
-    titulo: 'Retraso en ruta norte',
-    fecha: 'Ayer, 04:30 PM',
-    descripcion: 'El camion de basura inorganica presenta un retraso de 30 minutos.',
+    titulo: 'Reportes de contenedores',
+    fecha: 'En línea',
+    descripcion:
+      'Informa si un contenedor está lleno, dañado, sucio o aparece en una ubicación incorrecta.',
   },
 ];
 
-const calendario = [
-  { id: '1', dia: 'Lunes', tipo: 'Organica', horario: '08:00 AM - 10:00 AM', color: colores.primary },
-  { id: '2', dia: 'Martes', tipo: 'Inorganica', horario: '09:00 AM - 11:00 AM', color: '#2196F3' },
-  { id: '3', dia: 'Miercoles', tipo: 'Reciclaje', horario: '07:00 AM - 09:00 AM', color: colores.secondary },
-  { id: '4', dia: 'Jueves', tipo: 'Organica', horario: '08:00 AM - 10:00 AM', color: colores.primary },
-  { id: '5', dia: 'Viernes', tipo: 'Inorganica', horario: '09:00 AM - 11:00 AM', color: '#2196F3' },
+const diasSemana = [
+  { id: 'lunes', nombre: 'Lunes', corto: 'Lun' },
+  { id: 'martes', nombre: 'Martes', corto: 'Mar' },
+  { id: 'miercoles', nombre: 'Miércoles', corto: 'Mié' },
+  { id: 'jueves', nombre: 'Jueves', corto: 'Jue' },
+  { id: 'viernes', nombre: 'Viernes', corto: 'Vie' },
+  { id: 'sabado', nombre: 'Sábado', corto: 'Sáb' },
+  { id: 'domingo', nombre: 'Domingo', corto: 'Dom' },
 ];
 
 export function PantallaInicio() {
-  const [detalleVisible, cambiarDetalleVisible] = useState(false);
+  const [rutas, cambiarRutas] = useState([]);
+  const [cargando, cambiarCargando] = useState(true);
+  const [error, cambiarError] = useState('');
   const [diaSeleccionado, cambiarDiaSeleccionado] = useState(null);
+
+  const cargarRutas = useCallback(async () => {
+    try {
+      cambiarCargando(true);
+      cambiarError('');
+      const respuesta = await conexionApi.get('/rutas');
+      cambiarRutas(respuesta.data);
+    } catch (excepcion) {
+      cambiarError(
+        obtenerMensajeErrorApi(
+          excepcion,
+          'No fue posible consultar el calendario de recolección.',
+        ),
+      );
+    } finally {
+      cambiarCargando(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      cargarRutas();
+    }, [cargarRutas]),
+  );
+
+  const calendario = diasSemana.map((dia) => ({
+    ...dia,
+    rutas: rutas.filter((ruta) => ruta.dia_semana === dia.id),
+  }));
 
   function abrirDetalle(dia) {
     cambiarDiaSeleccionado(dia);
-    cambiarDetalleVisible(true);
-  }
-
-  function cerrarDetalle() {
-    cambiarDetalleVisible(false);
   }
 
   return (
     <PantallaBase centrada={false}>
       <View style={estilos.encabezado}>
-        <Text style={estilos.titulo}>Inicio y Comunidad</Text>
-        <Text style={estilos.subtitulo}>Hola de nuevo, mantengamos limpia nuestra ciudad.</Text>
+        <Text style={estilos.titulo}>Inicio y comunidad</Text>
+        <Text style={estilos.subtitulo}>
+          Consulta qué día pasará la recolección y su horario aproximado.
+        </Text>
       </View>
 
       <View style={estilos.seccion}>
-        <Text style={estilos.tituloSeccion}>Ultimos Anuncios</Text>
+        <View style={estilos.tituloCalendarioFila}>
+          <View style={estilos.tituloConIcono}>
+            <CalendarDays color={colores.primary} size={23} />
+            <Text style={estilos.tituloSeccion}>Calendario semanal</Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Actualizar calendario"
+            onPress={cargarRutas}
+            style={estilos.botonActualizar}
+          >
+            {cargando ? (
+              <ActivityIndicator color={colores.primary} />
+            ) : (
+              <RefreshCw color={colores.primary} size={19} />
+            )}
+          </Pressable>
+        </View>
+
+        <Text style={estilos.leyenda}>
+          Los días verdes tienen una recolección programada.
+        </Text>
+        {error ? <Text style={estilos.error}>{error}</Text> : null}
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={estilos.calendario}
+        >
+          {calendario.map((dia) => {
+            const tieneRuta = dia.rutas.length > 0;
+            return (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${dia.nombre}, ${
+                  tieneRuta ? `${dia.rutas.length} rutas` : 'sin recolección'
+                }`}
+                key={dia.id}
+                onPress={() => abrirDetalle(dia)}
+                style={[
+                  estilos.tarjetaDia,
+                  tieneRuta ? estilos.diaConRuta : estilos.diaSinRuta,
+                ]}
+              >
+                <Text
+                  style={[
+                    estilos.textoDia,
+                    tieneRuta && estilos.textoDiaActivo,
+                  ]}
+                >
+                  {dia.corto}
+                </Text>
+                <View
+                  style={[
+                    estilos.indicadorDia,
+                    tieneRuta && estilos.indicadorActivo,
+                  ]}
+                >
+                  {tieneRuta ? (
+                    <Route color={colores.white} size={20} />
+                  ) : (
+                    <Text style={estilos.guion}>—</Text>
+                  )}
+                </View>
+                <Text
+                  style={[
+                    estilos.textoEstadoDia,
+                    tieneRuta && estilos.textoEstadoActivo,
+                  ]}
+                >
+                  {tieneRuta
+                    ? dia.rutas.length === 1
+                      ? dia.rutas[0].hora_aproximada
+                      : `${dia.rutas.length} rutas`
+                    : 'Sin ruta'}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      <View style={estilos.seccion}>
+        <Text style={estilos.tituloSeccion}>Avisos de la comunidad</Text>
         {avisos.map((aviso) => (
           <View key={aviso.id} style={estilos.tarjetaAviso}>
             <View style={estilos.encabezadoAviso}>
@@ -60,44 +186,66 @@ export function PantallaInicio() {
         ))}
       </View>
 
-      <View style={estilos.seccion}>
-        <Text style={estilos.tituloSeccion}>Calendario Semanal</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={estilos.calendario}>
-          {calendario.map((dia) => (
-            <Pressable
-              accessibilityRole="button"
-              key={dia.id}
-              onPress={() => abrirDetalle(dia)}
-              style={[estilos.tarjetaDia, { borderTopColor: dia.color }]}
-            >
-              <Text style={estilos.textoDia}>{dia.dia}</Text>
-              <Text style={estilos.textoTipo}>{dia.tipo}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
-
-      <Modal animationType="slide" transparent visible={detalleVisible} onRequestClose={cerrarDetalle}>
+      <Modal
+        animationType="slide"
+        transparent
+        visible={Boolean(diaSeleccionado)}
+        onRequestClose={() => cambiarDiaSeleccionado(null)}
+      >
         <View style={estilos.fondoModal}>
           <View style={estilos.modal}>
             {diaSeleccionado ? (
               <>
-                <Text style={estilos.tituloModal}>Detalle del {diaSeleccionado.dia}</Text>
+                <Text style={estilos.tituloModal}>{diaSeleccionado.nombre}</Text>
+                <Text style={estilos.subtituloModal}>
+                  {diaSeleccionado.rutas.length > 0
+                    ? 'Recolección programada'
+                    : 'No hay rutas activas para este día'}
+                </Text>
 
-                <View style={estilos.filaModal}>
-                  <Text style={estilos.etiquetaModal}>Tipo de recoleccion:</Text>
-                  <Text style={[estilos.valorModal, { color: diaSeleccionado.color }]}>{diaSeleccionado.tipo}</Text>
-                </View>
+                <ScrollView
+                  style={estilos.listaModal}
+                  contentContainerStyle={estilos.listaModalContenido}
+                >
+                  {diaSeleccionado.rutas.map((ruta) => (
+                    <View key={ruta.id} style={estilos.rutaModal}>
+                      <Text style={estilos.nombreRuta}>{ruta.nombre}</Text>
+                      <View style={estilos.datoRuta}>
+                        <Clock3 color={colores.primary} size={18} />
+                        <Text style={estilos.textoDatoRuta}>
+                          Aproximadamente a las {ruta.hora_aproximada}
+                        </Text>
+                      </View>
+                      <View style={estilos.datoRuta}>
+                        <MapPin color={colores.primary} size={18} />
+                        <Text style={estilos.textoDatoRuta}>{ruta.zona}</Text>
+                      </View>
+                      <Text style={estilos.contenedoresRuta}>
+                        {ruta.contenedores.length}{' '}
+                        {ruta.contenedores.length === 1
+                          ? 'contenedor incluido'
+                          : 'contenedores incluidos'}
+                      </Text>
+                      {ruta.descripcion ? (
+                        <Text style={estilos.descripcionRuta}>{ruta.descripcion}</Text>
+                      ) : null}
+                    </View>
+                  ))}
+                </ScrollView>
 
-                <View style={estilos.filaModal}>
-                  <Text style={estilos.etiquetaModal}>Horario aproximado:</Text>
-                  <Text style={estilos.valorModal}>{diaSeleccionado.horario}</Text>
-                </View>
+                {diaSeleccionado.rutas.length > 0 ? (
+                  <Text style={estilos.notaModal}>
+                    Ten preparada tu basura antes del horario indicado; la hora
+                    puede variar según el recorrido.
+                  </Text>
+                ) : null}
 
-                <Text style={estilos.notaModal}>Recuerda sacar tus contenedores 15 minutos antes del horario indicado.</Text>
-
-                <Pressable accessibilityRole="button" style={estilos.botonCerrar} onPress={cerrarDetalle}>
-                  <Text style={estilos.textoBotonCerrar}>Cerrar Detalle</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  style={estilos.botonCerrar}
+                  onPress={() => cambiarDiaSeleccionado(null)}
+                >
+                  <Text style={estilos.textoBotonCerrar}>Cerrar</Text>
                 </Pressable>
               </>
             ) : null}
@@ -109,36 +257,89 @@ export function PantallaInicio() {
 }
 
 const estilos = StyleSheet.create({
-  encabezado: {
-    marginBottom: espaciado.xl,
-    marginTop: espaciado.sm,
-  },
-  titulo: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: colores.primary,
-  },
+  encabezado: { marginBottom: espaciado.xl, marginTop: espaciado.sm },
+  titulo: { color: colores.primary, fontSize: 26, fontWeight: '900' },
   subtitulo: {
-    fontSize: 15,
-    color: colores.muted,
     marginTop: espaciado.xs,
+    color: colores.muted,
+    fontSize: 15,
+    lineHeight: 21,
   },
-  seccion: {
-    marginBottom: espaciado.xxl,
+  seccion: { marginBottom: espaciado.xxl },
+  tituloCalendarioFila: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: espaciado.md,
   },
   tituloSeccion: {
+    color: colores.text,
     fontSize: 18,
     fontWeight: '900',
-    color: colores.text,
     marginBottom: espaciado.md,
   },
-  tarjetaAviso: {
-    backgroundColor: colores.white,
-    padding: espaciado.lg,
-    borderRadius: 12,
+  tituloConIcono: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: espaciado.sm,
+  },
+  leyenda: {
     marginBottom: espaciado.md,
+    color: colores.muted,
+    fontSize: 13,
+  },
+  botonActualizar: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: colores.border,
+    borderRadius: 13,
+    backgroundColor: colores.white,
+  },
+  error: {
+    marginBottom: espaciado.md,
+    padding: espaciado.md,
+    color: colores.danger,
+    fontSize: 13,
+    borderRadius: 12,
+    backgroundColor: '#FFF1F0',
+  },
+  calendario: { paddingBottom: espaciado.sm },
+  tarjetaDia: {
+    minWidth: 105,
+    alignItems: 'center',
+    gap: espaciado.sm,
+    marginRight: espaciado.sm,
+    paddingHorizontal: espaciado.md,
+    paddingVertical: espaciado.lg,
+    borderWidth: 1,
+    borderRadius: 16,
+  },
+  diaConRuta: { borderColor: colores.primary, backgroundColor: '#EAF7EE' },
+  diaSinRuta: { borderColor: colores.border, backgroundColor: colores.surface },
+  textoDia: { color: colores.muted, fontSize: 15, fontWeight: '900' },
+  textoDiaActivo: { color: colores.primaryDark },
+  indicadorDia: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+    backgroundColor: colores.border,
+  },
+  indicadorActivo: { backgroundColor: colores.primary },
+  guion: { color: colores.muted, fontSize: 18, fontWeight: '900' },
+  textoEstadoDia: { color: colores.muted, fontSize: 12, fontWeight: '800' },
+  textoEstadoActivo: { color: colores.primaryDark },
+  tarjetaAviso: {
+    marginBottom: espaciado.md,
+    padding: espaciado.lg,
+    borderWidth: 1,
+    borderColor: colores.border,
+    borderRadius: 12,
+    backgroundColor: colores.white,
   },
   encabezadoAviso: {
     flexDirection: 'row',
@@ -146,101 +347,62 @@ const estilos = StyleSheet.create({
     gap: espaciado.md,
     marginBottom: espaciado.sm,
   },
-  tituloAviso: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '800',
-    color: colores.text,
-  },
-  fechaAviso: {
-    fontSize: 12,
-    color: colores.muted,
-  },
-  descripcionAviso: {
-    fontSize: 14,
-    color: colores.muted,
-    lineHeight: 20,
-  },
-  calendario: {
-    paddingBottom: espaciado.sm,
-  },
-  tarjetaDia: {
-    minWidth: 120,
-    alignItems: 'center',
-    backgroundColor: colores.white,
-    padding: espaciado.lg,
-    borderRadius: 12,
-    marginRight: espaciado.md,
-    borderWidth: 1,
-    borderColor: colores.border,
-    borderTopWidth: 4,
-  },
-  textoDia: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: colores.text,
-    marginBottom: espaciado.xs,
-  },
-  textoTipo: {
-    fontSize: 13,
-    color: colores.muted,
-  },
+  tituloAviso: { flex: 1, color: colores.text, fontSize: 15, fontWeight: '800' },
+  fechaAviso: { color: colores.primary, fontSize: 12, fontWeight: '800' },
+  descripcionAviso: { color: colores.muted, fontSize: 14, lineHeight: 20 },
   fondoModal: {
     flex: 1,
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   modal: {
-    backgroundColor: colores.white,
+    maxHeight: '82%',
+    padding: espaciado.xl,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: espaciado.xl,
+    backgroundColor: colores.white,
   },
   tituloModal: {
-    fontSize: 22,
-    fontWeight: '900',
     color: colores.text,
-    marginBottom: espaciado.xl,
+    fontSize: 23,
+    fontWeight: '900',
     textAlign: 'center',
   },
-  filaModal: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: espaciado.md,
-    marginBottom: espaciado.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colores.border,
-    paddingBottom: espaciado.sm,
-  },
-  etiquetaModal: {
-    flex: 1,
-    fontSize: 15,
+  subtituloModal: {
+    marginTop: espaciado.xs,
+    marginBottom: espaciado.lg,
     color: colores.muted,
-    fontWeight: '700',
+    fontSize: 14,
+    textAlign: 'center',
   },
-  valorModal: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '900',
-    color: colores.text,
-    textAlign: 'right',
+  listaModal: { maxHeight: 360 },
+  listaModalContenido: { gap: espaciado.md },
+  rutaModal: {
+    gap: espaciado.sm,
+    padding: espaciado.lg,
+    borderWidth: 1,
+    borderColor: colores.primary,
+    borderRadius: 15,
+    backgroundColor: '#F4FBF6',
   },
+  nombreRuta: { color: colores.text, fontSize: 17, fontWeight: '900' },
+  datoRuta: { flexDirection: 'row', alignItems: 'center', gap: espaciado.sm },
+  textoDatoRuta: { flex: 1, color: colores.text, fontSize: 14, fontWeight: '700' },
+  contenedoresRuta: { color: colores.primaryDark, fontSize: 12, fontWeight: '800' },
+  descripcionRuta: { color: colores.muted, fontSize: 13, lineHeight: 18 },
   notaModal: {
-    fontSize: 13,
+    marginTop: espaciado.lg,
+    marginBottom: espaciado.lg,
     color: colores.muted,
-    marginTop: espaciado.sm,
-    marginBottom: espaciado.xl,
+    fontSize: 13,
+    lineHeight: 18,
     textAlign: 'center',
   },
   botonCerrar: {
-    backgroundColor: colores.primary,
+    alignItems: 'center',
     paddingVertical: 14,
     borderRadius: 10,
-    alignItems: 'center',
+    backgroundColor: colores.primary,
   },
-  textoBotonCerrar: {
-    color: colores.white,
-    fontSize: 16,
-    fontWeight: '900',
-  },
+  textoBotonCerrar: { color: colores.white, fontSize: 16, fontWeight: '900' },
 });

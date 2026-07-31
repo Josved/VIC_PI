@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base_datos import Base
@@ -84,3 +84,41 @@ class Reporte(Base):
         onupdate=ahora_utc,
         nullable=False,
     )
+
+
+class RutaRecoleccion(Base):
+    __tablename__ = "rutas_recoleccion"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    nombre: Mapped[str] = mapped_column(String(100), nullable=False)
+    zona: Mapped[str] = mapped_column(String(120), nullable=False)
+    dia_semana: Mapped[str] = mapped_column(String(12), nullable=False, index=True)
+    hora_aproximada: Mapped[str] = mapped_column(String(5), nullable=False)
+    descripcion: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    activa: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
+    creado_por_id: Mapped[int] = mapped_column(
+        ForeignKey("usuarios.id"),
+        nullable=False,
+        index=True,
+    )
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
+    actualizado_en: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=ahora_utc,
+        onupdate=ahora_utc,
+        nullable=False,
+    )
+
+
+class RutaContenedor(Base):
+    __tablename__ = "rutas_contenedores"
+
+    ruta_id: Mapped[int] = mapped_column(
+        ForeignKey("rutas_recoleccion.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    contenedor_id: Mapped[int] = mapped_column(
+        ForeignKey("contenedores.id"),
+        primary_key=True,
+    )
+    orden: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

@@ -5,8 +5,8 @@ Fecha de revisión: 2026-07-30
 ## Resumen
 
 VIC tiene autenticación, navegación móvil, contenedores geográficos persistidos,
-historial de detecciones QR y reportes con seguimiento por rol. Los avisos y el
-calendario todavía son datos locales de demostración.
+historial de detecciones QR, reportes con seguimiento por rol y rutas semanales
+administradas por recolectores. Los avisos todavía son datos locales.
 
 ## Acciones disponibles
 
@@ -27,11 +27,12 @@ todavía no existe una pantalla administrativa para cambiar roles.
 
 ### Inicio y comunidad
 
-- Consultar avisos locales de demostración.
-- Consultar un calendario semanal local.
-- Abrir y cerrar el detalle de un día.
+- Consultar avisos locales.
+- Consultar desde la API un calendario semanal de rutas activas.
+- Identificar en verde los días con recolección.
+- Abrir el detalle de un día con hora aproximada, zona y contenedores.
 
-No existen tablas ni endpoints para administrar avisos o calendarios.
+Todavía no existen tablas ni endpoints para administrar avisos.
 
 ### Contenedores
 
@@ -42,6 +43,15 @@ No existen tablas ni endpoints para administrar avisos o calendarios.
 - Guardar un historial de cada detección.
 - Consultar contenedores dentro de 1, 5 o 10 kilómetros.
 - Ordenar por distancia y seleccionar marcadores o elementos de la lista.
+- Permitir el registro o actualización por QR a cualquier usuario autenticado.
+
+### Rutas semanales
+
+- Crear rutas con nombre, zona, día y hora aproximada.
+- Seleccionar y ordenar los contenedores del recorrido.
+- Editar, activar o pausar rutas.
+- Limitar la gestión a recolectores y administradores.
+- Permitir que los ciudadanos consulten únicamente las rutas activas.
 
 ### Reportes
 
@@ -53,7 +63,8 @@ No existen tablas ni endpoints para administrar avisos o calendarios.
 
 ### Perfil
 
-- Muestra los datos de la sesión.
+- Muestra los datos, rol y capacidades de la sesión.
+- Ofrece acceso directo a Rutas para recolector y administrador.
 - Permite cerrar sesión.
 
 ## API existente
@@ -73,6 +84,10 @@ No existen tablas ni endpoints para administrar avisos o calendarios.
 - `GET /reportes/mios`: lista los reportes del usuario.
 - `GET /reportes`: lista global para recolector y administrador.
 - `PATCH /reportes/{id}/estado`: actualiza estado con rol autorizado.
+- `GET /rutas`: calendario de rutas activas para usuarios autenticados.
+- `GET /rutas/mias`: rutas gestionables por recolector o administrador.
+- `POST /rutas`: crea una ruta semanal.
+- `PATCH /rutas/{id}`: edita, activa o pausa una ruta autorizada.
 - `GET /docs`: documentación Swagger.
 
 ## Base de datos
@@ -103,15 +118,17 @@ La tabla de identidad es `usuarios`:
   usuario, GPS, precisión y fecha.
 - `reportes`: contenedor, usuario, motivo, comentario, evidencia, estado y
   marcas de tiempo.
+- `rutas_recoleccion`: nombre, zona, día, hora, estado, creador y marcas de
+  tiempo.
+- `rutas_contenedores`: relación ordenada de contenedores por ruta.
 
-No existen todavía tablas para avisos, calendario, archivos o tokens de
-recuperación.
+No existen todavía tablas para avisos, archivos o tokens de recuperación.
 
 ## Limitaciones antes de considerarlo completo
 
 - Implementar una pantalla administrativa para asignar roles.
 - Añadir almacenamiento real de archivos; por ahora la evidencia es una URL.
-- Implementar avisos y calendario desde el backend.
+- Implementar avisos desde el backend.
 - Implementar recuperación real de contraseña.
 - Añadir migraciones de esquema; actualmente se usa `create_all`.
 - Definir copias de seguridad del volumen SQLite.
@@ -127,4 +144,4 @@ recuperación.
 - Compilación web de Expo y servicio estático con Nginx.
 - Proxy `/api` para que el navegador y la API compartan origen.
 - Puerto directo de API para pruebas con Expo Go en la LAN.
-- Pruebas automatizadas de QR, GPS, reportes y permisos por rol.
+- Pruebas automatizadas de QR ciudadano, GPS, reportes, rutas y permisos por rol.

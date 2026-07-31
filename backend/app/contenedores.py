@@ -12,7 +12,6 @@ from .esquemas import (
     RegistroContenedorQRRespuesta,
 )
 from .modelos import Contenedor, RegistroUbicacionContenedor, Usuario, ahora_utc
-from .permisos import requiere_rol
 
 enrutador = APIRouter(prefix="/contenedores", tags=["contenedores"])
 RADIO_TIERRA_M = 6_371_000
@@ -58,7 +57,7 @@ def crear_respuesta(
 @enrutador.post("/registrar-qr", response_model=RegistroContenedorQRRespuesta)
 def registrar_contenedor_por_qr(
     datos: RegistroContenedorQREntrada,
-    usuario_actual: Usuario = Depends(requiere_rol("collector", "admin")),
+    usuario_actual: Usuario = Depends(obtener_usuario_actual),
     base_datos: Session = Depends(obtener_base_datos),
 ):
     contenedor = base_datos.scalar(

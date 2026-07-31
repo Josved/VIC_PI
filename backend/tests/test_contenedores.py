@@ -117,8 +117,13 @@ class PruebasContenedores(unittest.TestCase):
             },
         )
         self.assertEqual(cercanos.status_code, 200, cercanos.text)
-        self.assertEqual([item["codigo_qr"] for item in cercanos.json()], [codigo])
-        self.assertEqual(cercanos.json()[0]["distancia_m"], 0)
+        codigos_cercanos = [item["codigo_qr"] for item in cercanos.json()]
+        self.assertIn(codigo, codigos_cercanos)
+        self.assertNotIn("VIC:CONTENEDOR:LEJANO", codigos_cercanos)
+        contenedor_prueba = next(
+            item for item in cercanos.json() if item["codigo_qr"] == codigo
+        )
+        self.assertEqual(contenedor_prueba["distancia_m"], 0)
 
         with SesionLocal() as base_datos:
             registros = base_datos.query(RegistroUbicacionContenedor).filter_by(
@@ -158,17 +163,36 @@ class PruebasContenedores(unittest.TestCase):
         )
         self.assertEqual(respuesta.status_code, 422, respuesta.text)
 
-    def test_ciudadano_no_puede_registrar_contenedores(self):
-        respuesta = self.cliente.post(
+    def test_ciudadano_puede_registrar_y_actualizar_ubicacion(self):
+        creacion = self.cliente.post(
             "/contenedores/registrar-qr",
             headers=self.encabezados_ciudadano,
             json={
-                "codigo_qr": "VIC:CONTENEDOR:NO-AUTORIZADO",
+                "codigo_qr": "VIC:CONTENEDOR:CIUDADANO-001",
                 "latitud": 19.4326,
                 "longitud": -99.1332,
             },
         )
-        self.assertEqual(respuesta.status_code, 403, respuesta.text)
+        self.assertEqual(creacion.status_code, 200, creacion.text)
+        self.assertEqual(creacion.json()["accion"], "creado")
+
+        actualizacion = self.cliente.post(
+            "/contenedores/registrar-qr",
+            headers=self.encabezados_ciudadano,
+            json={
+                "codigo_qr": "VIC:CONTENEDOR:CIUDADANO-001",
+                "latitud": 19.4331,
+                "longitud": -99.1328,
+                "precision_m": 3,
+            },
+        )
+        self.assertEqual(actualizacion.status_code, 200, actualizacion.text)
+        self.assertEqual(actualizacion.json()["accion"], "actualizado")
+        self.assertEqual(actualizacion.json()["contenedor"]["veces_registrado"], 2)
+        self.assertEqual(
+            actualizacion.json()["contenedor"]["actualizado_por_id"],
+            creacion.json()["contenedor"]["actualizado_por_id"],
+        )
 
     def test_reportes_y_permisos_por_rol(self):
         contenedor = self.cliente.post(
@@ -221,6 +245,78 @@ class PruebasContenedores(unittest.TestCase):
         )
         self.assertEqual(actualizado.status_code, 200, actualizado.text)
         self.assertEqual(actualizado.json()["estado"], "resuelto")
+
+    def test_rutas_semanales_y_permisos(self):
+        contenedor = self.cliente.post(
+            "/contenedores/registrar-qr",
+            headers=self.encabezados_ciudadano,
+            json={
+                "codigo_qr": "VIC:CONTENEDOR:RUTA-001",
+                "latitud": 19.4326,
+                "longitud": -99.1332,
+            },
+        )
+        self.assertEqual(contenedor.status_code, 200, contenedor.text)
+        contenedor_id = contenedor.json()["contenedor"]["id"]
+
+        ruta_ciudadano = self.cliente.post(
+            "/rutas",
+            headers=self.encabezados_ciudadano,
+            json={
+                "nombre": "Ruta no autorizada",
+                "zona": "Centro",
+                "dia_semana": "lunes",
+                "hora_aproximada": "08:30",
+                "contenedor_ids": [contenedor_id],
+            },
+        )
+        self.assertEqual(ruta_ciudadano.status_code, 403, ruta_ciudadano.text)
+
+        creacion = self.cliente.post(
+            "/rutas",
+            headers=self.encabezados,
+            json={
+                "nombre": "Ruta Centro",
+                "zona": "Barrio Centro",
+                "dia_semana": "miercoles",
+                "hora_aproximada": "08:30",
+                "descripcion": "Recoleccion semanal",
+                "contenedor_ids": [contenedor_id],
+            },
+        )
+        self.assertEqual(creacion.status_code, 201, creacion.text)
+        ruta_id = creacion.json()["id"]
+        self.assertEqual(creacion.json()["contenedores"][0]["id"], contenedor_id)
+
+        calendario = self.cliente.get("/rutas", headers=self.encabezados_ciudadano)
+        self.assertEqual(calendario.status_code, 200, calendario.text)
+        self.assertIn(ruta_id, [ruta["id"] for ruta in calendario.json()])
+
+        actualizacion = self.cliente.patch(
+            f"/rutas/{ruta_id}",
+            headers=self.encabezados,
+            json={"dia_semana": "jueves", "hora_aproximada": "09:15"},
+        )
+        self.assertEqual(actualizacion.status_code, 200, actualizacion.text)
+        self.assertEqual(actualizacion.json()["dia_semana"], "jueves")
+        self.assertEqual(actualizacion.json()["hora_aproximada"], "09:15")
+
+        desactivacion = self.cliente.patch(
+            f"/rutas/{ruta_id}",
+            headers=self.encabezados,
+            json={"activa": False},
+        )
+        self.assertEqual(desactivacion.status_code, 200, desactivacion.text)
+        self.assertFalse(desactivacion.json()["activa"])
+
+        calendario_final = self.cliente.get(
+            "/rutas",
+            headers=self.encabezados_ciudadano,
+        )
+        self.assertNotIn(ruta_id, [ruta["id"] for ruta in calendario_final.json()])
+
+        gestionables = self.cliente.get("/rutas/mias", headers=self.encabezados)
+        self.assertIn(ruta_id, [ruta["id"] for ruta in gestionables.json()])
 
 
 if __name__ == "__main__":

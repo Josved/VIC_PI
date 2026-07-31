@@ -2,7 +2,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import { Home, MapPinned, QrCode, UserRound } from 'lucide-react-native';
+import { Home, MapPinned, QrCode, Route, UserRound } from 'lucide-react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ProveedorSesion, usarSesion } from './componentes/ContextoSesion';
@@ -15,6 +15,7 @@ import { PantallaCarga } from './Pantallas/Pantalla_Carga';
 import { PantallaPerfil } from './Pantallas/PantallaPerfil';
 import { PantallaRegistro } from './Pantallas/PantallaRegistro';
 import { PantallaReportes } from './Pantallas/PantallaReportes';
+import { PantallaRutas } from './Pantallas/PantallaRutas';
 
 const PilaSesion = createNativeStackNavigator();
 const PestanasPrincipales = createBottomTabNavigator();
@@ -30,6 +31,10 @@ function NavegadorSesion() {
 }
 
 function NavegadorPrincipal() {
+  const { usuario } = usarSesion();
+  const puedeGestionarRutas =
+    usuario?.rol === 'collector' || usuario?.rol === 'admin';
+
   return (
     <PestanasPrincipales.Navigator
       screenOptions={{
@@ -59,6 +64,16 @@ function NavegadorPrincipal() {
         component={PantallaReportes}
         options={{ tabBarLabel: 'Reportes', tabBarIcon: ({ color }) => <QrCode color={color} size={22} /> }}
       />
+      {puedeGestionarRutas ? (
+        <PestanasPrincipales.Screen
+          name="Rutas"
+          component={PantallaRutas}
+          options={{
+            tabBarLabel: 'Rutas',
+            tabBarIcon: ({ color }) => <Route color={color} size={22} />,
+          }}
+        />
+      ) : null}
       <PestanasPrincipales.Screen
         name="Perfil"
         component={PantallaPerfil}

@@ -7,6 +7,7 @@ from .base_datos import Base, motor_base_datos
 from .configuracion import configuracion
 from .contenedores import enrutador as enrutador_contenedores
 from .reportes import enrutador as enrutador_reportes
+from .rutas import enrutador as enrutador_rutas
 
 Base.metadata.create_all(bind=motor_base_datos)
 
@@ -26,6 +27,7 @@ aplicacion.add_middleware(
 aplicacion.include_router(enrutador_autenticacion)
 aplicacion.include_router(enrutador_contenedores)
 aplicacion.include_router(enrutador_reportes)
+aplicacion.include_router(enrutador_rutas)
 
 
 @aplicacion.get("/")

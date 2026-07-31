@@ -6,6 +6,15 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 RolUsuario = Literal["citizen", "collector", "admin"]
 MotivoReporte = Literal["lleno", "danado", "sucio", "ubicacion_incorrecta", "otro"]
 EstadoReporte = Literal["pendiente", "en_revision", "resuelto"]
+DiaSemana = Literal[
+    "lunes",
+    "martes",
+    "miercoles",
+    "jueves",
+    "viernes",
+    "sabado",
+    "domingo",
+]
 
 PATRON_NOMBRE = r"^[A-Za-zÁÉÍÓÚÑÜáéíóúñü]+(?:[ '\-][A-Za-zÁÉÍÓÚÑÜáéíóúñü]+)*$"
 
@@ -110,3 +119,90 @@ class ReporteRespuesta(BaseModel):
 
 class ReporteActualizarEstado(BaseModel):
     estado: EstadoReporte
+
+
+class RutaCrear(BaseModel):
+    nombre: str = Field(min_length=2, max_length=100)
+    zona: str = Field(min_length=2, max_length=120)
+    dia_semana: DiaSemana
+    hora_aproximada: str = Field(pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+    descripcion: str | None = Field(default=None, max_length=500)
+    contenedor_ids: list[int] = Field(min_length=1, max_length=200)
+
+    @field_validator("nombre", "zona")
+    @classmethod
+    def limpiar_texto_obligatorio(cls, valor: str) -> str:
+        texto = valor.strip()
+        if len(texto) < 2:
+            raise ValueError("El texto debe contener al menos dos caracteres")
+        return texto
+
+    @field_validator("descripcion")
+    @classmethod
+    def limpiar_descripcion(cls, valor: str | None) -> str | None:
+        if valor is None:
+            return None
+        return valor.strip() or None
+
+    @field_validator("contenedor_ids")
+    @classmethod
+    def validar_contenedores(cls, valores: list[int]) -> list[int]:
+        if any(valor <= 0 for valor in valores):
+            raise ValueError("Los contenedores seleccionados no son validos")
+        if len(valores) != len(set(valores)):
+            raise ValueError("No se puede repetir un contenedor en la ruta")
+        return valores
+
+
+class RutaActualizar(BaseModel):
+    nombre: str | None = Field(default=None, min_length=2, max_length=100)
+    zona: str | None = Field(default=None, min_length=2, max_length=120)
+    dia_semana: DiaSemana | None = None
+    hora_aproximada: str | None = Field(
+        default=None,
+        pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$",
+    )
+    descripcion: str | None = Field(default=None, max_length=500)
+    contenedor_ids: list[int] | None = Field(default=None, min_length=1, max_length=200)
+    activa: bool | None = None
+
+    @field_validator("nombre", "zona")
+    @classmethod
+    def limpiar_texto_opcional(cls, valor: str | None) -> str | None:
+        if valor is None:
+            return None
+        texto = valor.strip()
+        if len(texto) < 2:
+            raise ValueError("El texto debe contener al menos dos caracteres")
+        return texto
+
+    @field_validator("contenedor_ids")
+    @classmethod
+    def validar_contenedores_opcionales(cls, valores: list[int] | None) -> list[int] | None:
+        if valores is None:
+            return None
+        if any(valor <= 0 for valor in valores):
+            raise ValueError("Los contenedores seleccionados no son validos")
+        if len(valores) != len(set(valores)):
+            raise ValueError("No se puede repetir un contenedor en la ruta")
+        return valores
+
+
+class ContenedorRutaRespuesta(BaseModel):
+    id: int
+    codigo_qr: str
+    orden: int
+
+
+class RutaRespuesta(BaseModel):
+    id: int
+    nombre: str
+    zona: str
+    dia_semana: DiaSemana
+    hora_aproximada: str
+    descripcion: str | None
+    activa: bool
+    creado_por_id: int
+    contenedores: list[ContenedorRutaRespuesta]
+    creado_en: datetime
+    actualizado_en: datetime
