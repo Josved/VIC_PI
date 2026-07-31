@@ -22,6 +22,24 @@ class Configuracion(BaseModel):
     )
     origenes_cors: list[str] = Field(default_factory=leer_origenes_cors)
     ruta_raiz: str = Field(default_factory=lambda: os.getenv("VIC_ROOT_PATH", ""))
+    url_enrutamiento: str = Field(
+        default_factory=lambda: os.getenv(
+            "VIC_ROUTING_URL",
+            "https://router.project-osrm.org",
+        ).rstrip("/"),
+    )
+    url_geocodificacion: str = Field(
+        default_factory=lambda: os.getenv(
+            "VIC_GEOCODING_URL",
+            "https://nominatim.openstreetmap.org",
+        ).rstrip("/"),
+    )
+    directorio_evidencias: str = Field(
+        default_factory=lambda: os.getenv("VIC_EVIDENCE_DIR", "./evidencias"),
+    )
+    url_publica_evidencias: str = Field(
+        default_factory=lambda: os.getenv("VIC_EVIDENCE_PUBLIC_URL", "/evidencias"),
+    )
 
 
 configuracion = Configuracion()

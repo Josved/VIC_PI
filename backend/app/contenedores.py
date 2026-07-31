@@ -11,7 +11,13 @@ from .esquemas import (
     RegistroContenedorQREntrada,
     RegistroContenedorQRRespuesta,
 )
-from .modelos import Contenedor, RegistroUbicacionContenedor, Usuario, ahora_utc
+from .modelos import (
+    Contenedor,
+    DetalleContenedor,
+    RegistroUbicacionContenedor,
+    Usuario,
+    ahora_utc,
+)
 
 enrutador = APIRouter(prefix="/contenedores", tags=["contenedores"])
 RADIO_TIERRA_M = 6_371_000
@@ -36,9 +42,11 @@ def calcular_distancia_m(
 
 
 def crear_respuesta(
+    base_datos: Session,
     contenedor: Contenedor,
     distancia_m: float | None = None,
 ) -> ContenedorRespuesta:
+    detalle = base_datos.get(DetalleContenedor, contenedor.id)
     return ContenedorRespuesta(
         id=contenedor.id,
         codigo_qr=contenedor.codigo_qr,
@@ -46,6 +54,12 @@ def crear_respuesta(
         longitud=contenedor.longitud,
         precision_m=contenedor.precision_m,
         distancia_m=round(distancia_m, 1) if distancia_m is not None else None,
+        direccion_completa=detalle.direccion_completa if detalle else None,
+        calle=detalle.calle if detalle else None,
+        numero=detalle.numero if detalle else None,
+        colonia=detalle.colonia if detalle else None,
+        codigo_postal=detalle.codigo_postal if detalle else None,
+        municipio=detalle.municipio if detalle else None,
         veces_registrado=contenedor.veces_registrado,
         creado_por_id=contenedor.creado_por_id,
         actualizado_por_id=contenedor.actualizado_por_id,
@@ -95,12 +109,29 @@ def registrar_contenedor_por_qr(
             precision_m=datos.precision_m,
         ),
     )
+    campos_direccion = {
+        "direccion_completa": datos.direccion_completa,
+        "calle": datos.calle,
+        "numero": datos.numero,
+        "colonia": datos.colonia,
+        "codigo_postal": datos.codigo_postal,
+        "municipio": datos.municipio,
+    }
+    if any(campos_direccion.values()):
+        detalle = base_datos.get(DetalleContenedor, contenedor.id)
+        if not detalle:
+            detalle = DetalleContenedor(contenedor_id=contenedor.id)
+            base_datos.add(detalle)
+        for campo, valor in campos_direccion.items():
+            if valor is not None:
+                setattr(detalle, campo, valor.strip() or None)
+        detalle.actualizado_en = ahora_utc()
     base_datos.commit()
     base_datos.refresh(contenedor)
 
     return RegistroContenedorQRRespuesta(
         accion=accion,
-        contenedor=crear_respuesta(contenedor, 0),
+        contenedor=crear_respuesta(base_datos, contenedor, 0),
     )
 
 
@@ -127,7 +158,7 @@ def obtener_contenedores_cercanos(
 
     resultados.sort(key=lambda resultado: resultado[0])
     return [
-        crear_respuesta(contenedor, distancia)
+        crear_respuesta(base_datos, contenedor, distancia)
         for distancia, contenedor in resultados[:limite]
     ]
 
@@ -144,7 +175,7 @@ def obtener_contenedor(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Contenedor no encontrado",
         )
-    return crear_respuesta(contenedor)
+    return crear_respuesta(base_datos, contenedor)
 
 
 @enrutador.get("", response_model=list[ContenedorRespuesta])
@@ -155,4 +186,4 @@ def listar_contenedores(
     contenedores = base_datos.scalars(
         select(Contenedor).order_by(Contenedor.actualizado_en.desc()),
     ).all()
-    return [crear_respuesta(contenedor) for contenedor in contenedores]
+    return [crear_respuesta(base_datos, contenedor) for contenedor in contenedores]

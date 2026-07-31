@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .base_datos import obtener_base_datos
@@ -8,8 +9,11 @@ from .esquemas import (
     UsuarioAdministradoActualizar,
     UsuarioAdministradoCrear,
     UsuarioAdministradoRespuesta,
+    VehiculoActualizar,
+    VehiculoCrear,
+    VehiculoRespuesta,
 )
-from .modelos import AsignacionRuta, ControlUsuario, Usuario, ahora_utc
+from .modelos import AsignacionRuta, ControlUsuario, Usuario, Vehiculo, ahora_utc
 from .permisos import requiere_rol
 from .seguridad import cifrar_contrasena
 
@@ -196,3 +200,65 @@ def restablecer_contrasena(
     base_datos.commit()
     base_datos.refresh(usuario)
     return crear_respuesta(base_datos, usuario)
+
+
+@enrutador.get("/vehiculos", response_model=list[VehiculoRespuesta])
+def listar_vehiculos(
+    _administrador: Usuario = Depends(requiere_rol("admin")),
+    base_datos: Session = Depends(obtener_base_datos),
+):
+    return base_datos.scalars(
+        select(Vehiculo).order_by(Vehiculo.activo.desc(), Vehiculo.placa),
+    ).all()
+
+
+@enrutador.post(
+    "/vehiculos",
+    response_model=VehiculoRespuesta,
+    status_code=status.HTTP_201_CREATED,
+)
+def crear_vehiculo(
+    datos: VehiculoCrear,
+    _administrador: Usuario = Depends(requiere_rol("admin")),
+    base_datos: Session = Depends(obtener_base_datos),
+):
+    vehiculo = Vehiculo(placa=datos.placa)
+    base_datos.add(vehiculo)
+    try:
+        base_datos.commit()
+    except IntegrityError as error:
+        base_datos.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe un vehiculo con esa placa",
+        ) from error
+    base_datos.refresh(vehiculo)
+    return vehiculo
+
+
+@enrutador.patch("/vehiculos/{vehiculo_id}", response_model=VehiculoRespuesta)
+def actualizar_vehiculo(
+    vehiculo_id: int,
+    datos: VehiculoActualizar,
+    _administrador: Usuario = Depends(requiere_rol("admin")),
+    base_datos: Session = Depends(obtener_base_datos),
+):
+    vehiculo = base_datos.get(Vehiculo, vehiculo_id)
+    if not vehiculo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vehiculo no encontrado",
+        )
+    for campo, valor in datos.model_dump(exclude_unset=True).items():
+        setattr(vehiculo, campo, valor)
+    vehiculo.actualizado_en = ahora_utc()
+    try:
+        base_datos.commit()
+    except IntegrityError as error:
+        base_datos.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe un vehiculo con esa placa",
+        ) from error
+    base_datos.refresh(vehiculo)
+    return vehiculo

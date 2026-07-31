@@ -73,6 +73,32 @@ docker compose down
 No usar `docker compose down -v` en el servidor: la opción `-v` elimina el
 volumen que contiene SQLite.
 
+## Motor de rutas vial dentro de la LAN
+
+Por defecto el backend consulta `https://router.project-osrm.org`. Para que el
+cálculo de calles funcione sin Internet, se incluye `compose.osrm.yaml`:
+
+```powershell
+docker compose -f compose.yaml -f compose.osrm.yaml up -d --build
+```
+
+La primera ejecución descarga el mapa de México, lo prepara y crea el volumen
+`vic_osrm_data`. El proceso puede tardar y ocupar varios GB. Se puede reemplazar
+`OSRM_PBF_URL` por un extracto regional más pequeño antes de iniciar.
+
+Después de la preparación:
+
+- OSRM queda disponible internamente para el backend.
+- El puerto opcional `VIC_OSRM_PORT` permite diagnóstico desde el servidor.
+- Las rutas ya guardadas continúan funcionando aunque el geocodificador no
+  tenga Internet.
+- No ejecutar `docker compose down -v`, porque también eliminaría el mapa
+  preparado.
+
+La búsqueda inicial de direcciones usa Nominatim y necesita Internet, salvo que
+se configure un geocodificador propio mediante `VIC_GEOCODING_URL`. Las
+direcciones ya registradas se conservan en SQLite.
+
 ## Copia de seguridad de SQLite
 
 La base vive en el volumen `vic_data`. Antes de automatizar respaldos, detener

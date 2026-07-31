@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { KeyRound, ShieldCheck, UserPlus, UsersRound } from 'lucide-react-native';
+import { KeyRound, ShieldCheck, Truck, UserPlus, UsersRound } from 'lucide-react-native';
 
 import { Boton } from '../componentes/Boton';
 import { CampoTexto } from '../componentes/CampoTexto';
@@ -44,6 +44,8 @@ export function PantallaAdministracion() {
   const { usuario } = usarSesion();
   const [usuarios, cambiarUsuarios] = useState([]);
   const [incidencias, cambiarIncidencias] = useState([]);
+  const [vehiculos, cambiarVehiculos] = useState([]);
+  const [placa, cambiarPlaca] = useState('');
   const [formulario, cambiarFormulario] = useState(formularioInicial);
   const [usuarioClave, cambiarUsuarioClave] = useState(null);
   const [claveTemporal, cambiarClaveTemporal] = useState('');
@@ -56,12 +58,14 @@ export function PantallaAdministracion() {
     try {
       cambiarCargando(true);
       cambiarError('');
-      const [respuestaUsuarios, respuestaIncidencias] = await Promise.all([
+      const [respuestaUsuarios, respuestaIncidencias, respuestaVehiculos] = await Promise.all([
         conexionApi.get('/administracion/usuarios'),
         conexionApi.get('/operacion/incidencias'),
+        conexionApi.get('/administracion/vehiculos'),
       ]);
       cambiarUsuarios(respuestaUsuarios.data);
       cambiarIncidencias(respuestaIncidencias.data);
+      cambiarVehiculos(respuestaVehiculos.data);
     } catch (excepcion) {
       cambiarError(
         obtenerMensajeErrorApi(
@@ -153,6 +157,39 @@ export function PantallaAdministracion() {
     }
   }
 
+  async function crearVehiculo() {
+    if (placa.trim().length < 3) {
+      cambiarError('Escribe una placa válida.');
+      return;
+    }
+    try {
+      cambiarProcesando(true);
+      cambiarError('');
+      await conexionApi.post('/administracion/vehiculos', { placa: placa.trim() });
+      cambiarPlaca('');
+      cambiarExito('Vehículo registrado por placa.');
+      await cargar();
+    } catch (excepcion) {
+      cambiarError(obtenerMensajeErrorApi(excepcion, 'No se pudo registrar la placa.'));
+    } finally {
+      cambiarProcesando(false);
+    }
+  }
+
+  async function alternarVehiculo(vehiculo) {
+    try {
+      cambiarProcesando(true);
+      await conexionApi.patch(`/administracion/vehiculos/${vehiculo.id}`, {
+        activo: !vehiculo.activo,
+      });
+      await cargar();
+    } catch (excepcion) {
+      cambiarError(obtenerMensajeErrorApi(excepcion, 'No se pudo actualizar la placa.'));
+    } finally {
+      cambiarProcesando(false);
+    }
+  }
+
   return (
     <PantallaBase centrada={false}>
       <View style={estilos.encabezado}>
@@ -225,6 +262,49 @@ export function PantallaAdministracion() {
           cargando={procesando}
           alPresionar={crearUsuario}
         />
+      </View>
+
+      <View style={estilos.tarjeta}>
+        <View style={estilos.tituloFila}>
+          <Truck color={colores.primary} size={22} />
+          <Text style={estilos.tituloSeccion}>Vehículos por placa</Text>
+        </View>
+        <Text style={estilos.correo}>
+          Para identificar el camión solo se guarda la placa y si está activo.
+        </Text>
+        <CampoTexto
+          etiqueta="Placa"
+          autoCapitalize="characters"
+          placeholder="Ej. ABC-123-D"
+          value={placa}
+          onChangeText={cambiarPlaca}
+        />
+        <Boton
+          texto="Registrar placa"
+          cargando={procesando}
+          alPresionar={crearVehiculo}
+        />
+        <View style={estilos.chips}>
+          {vehiculos.map((vehiculo) => (
+            <Pressable
+              key={vehiculo.id}
+              onPress={() => alternarVehiculo(vehiculo)}
+              style={[
+                estilos.chip,
+                vehiculo.activo ? estilos.chipActivo : estilos.inactivo,
+              ]}
+            >
+              <Text
+                style={[
+                  estilos.textoChip,
+                  vehiculo.activo && estilos.textoChipActivo,
+                ]}
+              >
+                {vehiculo.placa} · {vehiculo.activo ? 'activo' : 'inactivo'}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
 
       <View style={estilos.tituloFila}>

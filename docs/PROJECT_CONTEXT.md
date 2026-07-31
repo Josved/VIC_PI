@@ -256,7 +256,8 @@ Carpeta principal: `backend/app`
 Dependencias importantes:
 
 - `bcrypt==4.0.1` esta fijado porque `passlib 1.7.4` presenta problemas con versiones nuevas de `bcrypt`.
-- `httpx2` esta incluido para pruebas con `TestClient` en la version actual de Starlette/FastAPI.
+- `httpx` se usa para las pruebas con `TestClient`.
+- `python-multipart` habilita la carga real de fotografías de evidencia.
 
 La base local `backend/vic.db` se genera automaticamente y NO debe subirse a Git.
 
@@ -271,6 +272,8 @@ La base local `backend/vic.db` se genera automaticamente y NO debe subirse a Git
 - Modulo 4 de reportes implementado.
 - Modulo 5 de rutas semanales implementado.
 - Modulo 6 de administración y operación en vivo implementado.
+- Módulo 7 de rutas por calles, direcciones, placas, ETA, evidencias, historial
+  y operación sin conexión implementado.
 - Frontend y backend probados en web.
 - `npm run typecheck` pasa correctamente.
 
@@ -292,7 +295,8 @@ Se valido:
 
 - Reemplazar `LogoVIC` temporal por el archivo oficial del logo si el equipo entrega el PNG/SVG.
 - Implementar recuperacion real de contrasena con token, expiracion y envio de correo si el alcance lo exige.
-- Probar en Expo Go fisico antes de entrega final, sobre todo si despues se agregan camara, QR, ubicacion o mapa.
+- Probar cámara, QR y GPS en un teléfono físico. El rastreo en segundo plano
+  requiere una compilación de desarrollo o producción y no funciona en Expo Go.
 - Mantener las pruebas automatizadas al agregar nuevas funciones.
 - Crear documentacion final de capturas para Zeroheight cuando el flujo definitivo este cerrado.
 

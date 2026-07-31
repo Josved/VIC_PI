@@ -2,11 +2,13 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 directorio_temporal = tempfile.TemporaryDirectory()
 ruta_base_datos = Path(directorio_temporal.name) / "vic-pruebas.db"
 os.environ["VIC_DATABASE_URL"] = f"sqlite:///{ruta_base_datos.as_posix()}"
 os.environ["VIC_JWT_SECRET"] = "secreto-exclusivo-para-pruebas"
+os.environ["VIC_EVIDENCE_DIR"] = str(Path(directorio_temporal.name) / "evidencias")
 
 from starlette.testclient import TestClient
 
@@ -524,6 +526,138 @@ class PruebasContenedores(unittest.TestCase):
         )
         self.assertEqual(sin_activo.status_code, 200, sin_activo.text)
         self.assertIsNone(sin_activo.json())
+
+    def test_ruta_vial_direcciones_placa_historial_y_evidencia(self):
+        vehiculo = self.cliente.post(
+            "/administracion/vehiculos",
+            headers=self.encabezados_admin,
+            json={"placa": "ABC-123-D"},
+        )
+        self.assertEqual(vehiculo.status_code, 201, vehiculo.text)
+        vehiculo_id = vehiculo.json()["id"]
+
+        contenedores = []
+        for indice, coordenadas in enumerate(
+            [(20.5994, -100.3327), (20.6020, -100.3290)],
+            start=1,
+        ):
+            respuesta = self.cliente.post(
+                "/contenedores/registrar-qr",
+                headers=self.encabezados_ciudadano,
+                json={
+                    "codigo_qr": f"VIC:VIAL:{indice}",
+                    "latitud": coordenadas[0],
+                    "longitud": coordenadas[1],
+                    "direccion_completa": f"Calle de prueba {indice}, Queretaro",
+                    "calle": "Calle de prueba",
+                    "numero": str(indice),
+                    "municipio": "Queretaro",
+                },
+            )
+            self.assertEqual(respuesta.status_code, 200, respuesta.text)
+            self.assertIn("Calle de prueba", respuesta.json()["contenedor"]["direccion_completa"])
+            contenedores.append(respuesta.json()["contenedor"])
+
+        calculo = {
+            "geometria": [
+                {"latitud": 20.598, "longitud": -100.334},
+                {"latitud": 20.5994, "longitud": -100.3327},
+                {"latitud": 20.601, "longitud": -100.331},
+                {"latitud": 20.6020, "longitud": -100.3290},
+            ],
+            "distancia_m": 1250.0,
+            "duracion_s": 420.0,
+            "duraciones_tramos_s": [120.0, 140.0, 160.0],
+            "proveedor": "osrm_openstreetmap",
+            "estado": "calculada",
+            "detalle": None,
+        }
+        puntos = [
+            {
+                "tipo": "inicio",
+                "latitud": 20.598,
+                "longitud": -100.334,
+                "direccion": "Base",
+            },
+            {
+                "tipo": "contenedor",
+                "contenedor_id": contenedores[0]["id"],
+                "latitud": contenedores[0]["latitud"],
+                "longitud": contenedores[0]["longitud"],
+            },
+            {
+                "tipo": "paso",
+                "latitud": 20.601,
+                "longitud": -100.331,
+                "direccion": "Paso obligatorio",
+            },
+            {
+                "tipo": "contenedor",
+                "contenedor_id": contenedores[1]["id"],
+                "latitud": contenedores[1]["latitud"],
+                "longitud": contenedores[1]["longitud"],
+            },
+        ]
+        with patch("app.rutas.calcular_recorrido", return_value=calculo):
+            ruta = self.cliente.post(
+                "/rutas",
+                headers=self.encabezados_admin,
+                json={
+                    "nombre": "Ruta vial",
+                    "zona": "Centro",
+                    "dia_semana": "martes",
+                    "hora_aproximada": "08:00",
+                    "contenedor_ids": [item["id"] for item in contenedores],
+                    "recolector_id": self.recolector_id,
+                    "vehiculo_id": vehiculo_id,
+                    "puntos_ruta": puntos,
+                },
+            )
+        self.assertEqual(ruta.status_code, 201, ruta.text)
+        datos_ruta = ruta.json()
+        self.assertEqual(datos_ruta["vehiculo"]["placa"], "ABC-123-D")
+        self.assertEqual(datos_ruta["proveedor_ruta"], "osrm_openstreetmap")
+        self.assertEqual(datos_ruta["duracion_minutos"], 7)
+        self.assertEqual(len(datos_ruta["geometria"]), 4)
+        self.assertEqual(len(datos_ruta["puntos_ruta"]), 4)
+        self.assertGreater(datos_ruta["contenedores"][1]["eta_minutos"], 0)
+
+        inicio = self.cliente.post(
+            f"/operacion/rutas/{datos_ruta['id']}/iniciar",
+            headers=self.encabezados,
+            json={"latitud": 20.598, "longitud": -100.334, "precision_m": 5},
+        )
+        self.assertEqual(inicio.status_code, 201, inicio.text)
+        self.assertEqual(inicio.json()["vehiculo"]["placa"], "ABC-123-D")
+        self.assertEqual(len(inicio.json()["geometria"]), 4)
+
+        recalculo = {
+            **calculo,
+            "distancia_m": 900.0,
+            "duracion_s": 300.0,
+            "duraciones_tramos_s": [150.0, 150.0],
+        }
+        with patch("app.operacion.calcular_recorrido", return_value=recalculo):
+            respuesta_recalculo = self.cliente.post(
+                f"/operacion/ejecuciones/{inicio.json()['id']}/recalcular",
+                headers=self.encabezados,
+                json={"latitud": 20.5985, "longitud": -100.3335},
+            )
+        self.assertEqual(respuesta_recalculo.status_code, 200, respuesta_recalculo.text)
+        self.assertEqual(respuesta_recalculo.json()["distancia_restante_m"], 900.0)
+        self.assertEqual(respuesta_recalculo.json()["duracion_restante_minutos"], 5)
+
+        historial = self.cliente.get("/operacion/historial", headers=self.encabezados)
+        self.assertEqual(historial.status_code, 200, historial.text)
+        self.assertIn(inicio.json()["id"], [item["id"] for item in historial.json()])
+
+        evidencia = self.cliente.post(
+            "/archivos/evidencias",
+            headers=self.encabezados,
+            files={"archivo": ("evidencia.png", b"\x89PNG\r\n", "image/png")},
+        )
+        self.assertEqual(evidencia.status_code, 200, evidencia.text)
+        self.assertTrue(evidencia.json()["url"].startswith("/evidencias/"))
 
 
 if __name__ == "__main__":

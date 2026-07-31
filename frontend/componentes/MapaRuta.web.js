@@ -1,50 +1,149 @@
-import { MapPinned, Navigation } from 'lucide-react-native';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { colores, espaciado } from './tema';
+import { colores } from './tema';
 
-export function MapaRuta({ paradas = [], ubicacionRecolector = null }) {
+function icono(etiqueta, color) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:28px;height:28px;border-radius:14px;background:${color};color:white;display:flex;align-items:center;justify-content:center;font-weight:800;border:2px solid white;box-shadow:0 2px 7px #0005">${etiqueta}</div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+  });
+}
+
+export function MapaRuta({
+  paradas = [],
+  puntos = [],
+  geometria = [],
+  ubicacionRecolector = null,
+  alAgregarPunto = null,
+  alEliminarPunto = null,
+  alto = 300,
+}) {
+  const contenedor = useRef(null);
+  const mapa = useRef(null);
+
+  useEffect(() => {
+    if (!contenedor.current) {
+      return undefined;
+    }
+    if (mapa.current) {
+      mapa.current.remove();
+    }
+    const instancia = L.map(contenedor.current, {
+      zoomControl: true,
+      attributionControl: true,
+    }).setView([20.5994, -100.3327], 13);
+    mapa.current = instancia;
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap',
+    }).addTo(instancia);
+
+    const puntosVisibles = puntos.length > 0 ? puntos : paradas;
+    const coordenadasRuta = (geometria.length > 0 ? geometria : puntosVisibles).map(
+      (punto) => [punto.latitud, punto.longitud],
+    );
+    if (coordenadasRuta.length > 1) {
+      L.polyline(coordenadasRuta, {
+        color: colores.primary,
+        weight: 5,
+        opacity: 0.9,
+      }).addTo(instancia);
+    }
+    puntosVisibles.forEach((punto, indice) => {
+      const esPaso = punto.tipo === 'paso';
+      const color = esPaso
+        ? '#FF9800'
+        : punto.tipo === 'inicio'
+          ? '#2196F3'
+          : punto.tipo === 'fin'
+            ? '#673AB7'
+            : colores.secondary;
+      const marcador = L.marker([punto.latitud, punto.longitud], {
+        icon: icono(`${indice + 1}`, color),
+      })
+        .addTo(instancia)
+        .bindPopup(
+          punto.direccion
+          || punto.codigo_qr
+          || (esPaso ? 'Punto de paso. Pulsa para eliminar.' : 'Parada'),
+        );
+      if (esPaso && alEliminarPunto) {
+        marcador.on('click', () => alEliminarPunto(indice));
+      }
+    });
+    if (ubicacionRecolector) {
+      L.marker(
+        [ubicacionRecolector.latitude, ubicacionRecolector.longitude],
+        { icon: icono('C', '#2196F3') },
+      )
+        .addTo(instancia)
+        .bindPopup('Recolector en recorrido');
+    }
+
+    const limites = [
+      ...coordenadasRuta,
+      ...(ubicacionRecolector
+        ? [[ubicacionRecolector.latitude, ubicacionRecolector.longitude]]
+        : []),
+    ];
+    if (limites.length > 0) {
+      instancia.fitBounds(limites, { padding: [32, 32], maxZoom: 17 });
+    }
+    if (alAgregarPunto) {
+      instancia.on('click', (evento) =>
+        alAgregarPunto({
+          latitude: evento.latlng.lat,
+          longitude: evento.latlng.lng,
+        }),
+      );
+    }
+    setTimeout(() => instancia.invalidateSize(), 50);
+
+    return () => {
+      instancia.remove();
+      mapa.current = null;
+    };
+  }, [
+    JSON.stringify(paradas),
+    JSON.stringify(puntos),
+    JSON.stringify(geometria),
+    ubicacionRecolector?.latitude,
+    ubicacionRecolector?.longitude,
+  ]);
+
   return (
-    <View style={estilos.contenedor}>
-      <MapPinned color={colores.primary} size={38} />
-      <Text style={estilos.titulo}>Recorrido en mapa móvil</Text>
-      <Text style={estilos.texto}>
-        En Android y iOS se dibuja la línea del recorrido y sus paradas.
-      </Text>
-      {ubicacionRecolector ? (
-        <View style={estilos.ubicacion}>
-          <Navigation color="#2196F3" size={18} />
-          <Text style={estilos.coordenadas}>
-            Recolector: {ubicacionRecolector.latitude.toFixed(5)},{' '}
-            {ubicacionRecolector.longitude.toFixed(5)}
-          </Text>
-        </View>
+    <View style={[estilos.marco, { height: alto }]}>
+      <div ref={contenedor} style={{ width: '100%', height: '100%' }} />
+      {alAgregarPunto ? (
+        <Text style={estilos.ayuda}>Haz clic en el mapa para agregar un punto de paso.</Text>
       ) : null}
-      <Text style={estilos.resumen}>
-        {paradas.length} parada{paradas.length === 1 ? '' : 's'} en el recorrido
-      </Text>
     </View>
   );
 }
 
 const estilos = StyleSheet.create({
-  contenedor: {
-    alignItems: 'center',
-    gap: espaciado.sm,
-    padding: espaciado.xl,
+  marco: {
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: colores.border,
     borderRadius: 18,
-    backgroundColor: colores.surface,
+    backgroundColor: '#eef4ef',
   },
-  titulo: { color: colores.text, fontSize: 17, fontWeight: '900' },
-  texto: {
-    color: colores.muted,
-    fontSize: 13,
-    lineHeight: 18,
-    textAlign: 'center',
+  ayuda: {
+    position: 'absolute',
+    left: 10,
+    bottom: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    color: colores.text,
+    backgroundColor: '#ffffffee',
+    fontSize: 12,
+    fontWeight: '700',
   },
-  ubicacion: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  coordenadas: { color: '#1769AA', fontSize: 12, fontWeight: '800' },
-  resumen: { color: colores.primary, fontSize: 13, fontWeight: '900' },
 });

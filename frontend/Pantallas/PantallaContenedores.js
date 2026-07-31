@@ -201,11 +201,29 @@ export function PantallaContenedores() {
 
     try {
       const coordenadas = await leerUbicacionActual(true);
+      let direccion = {};
+      try {
+        const respuestaDireccion = await conexionApi.get('/geografia/direccion', {
+          params: {
+            latitud: coordenadas.latitude,
+            longitud: coordenadas.longitude,
+          },
+        });
+        direccion = respuestaDireccion.data;
+      } catch {
+        // El GPS sigue siendo valido aunque el geocodificador no tenga conexion.
+      }
       const respuesta = await conexionApi.post('/contenedores/registrar-qr', {
         codigo_qr: codigoQr,
         latitud: coordenadas.latitude,
         longitud: coordenadas.longitude,
         precision_m: coordenadas.accuracy ?? null,
+        direccion_completa: direccion.direccion_completa ?? null,
+        calle: direccion.calle ?? null,
+        numero: direccion.numero ?? null,
+        colonia: direccion.colonia ?? null,
+        codigo_postal: direccion.codigo_postal ?? null,
+        municipio: direccion.municipio ?? null,
       });
 
       await cargarContenedoresCercanos(coordenadas, radioM);
@@ -402,6 +420,10 @@ export function PantallaContenedores() {
             <FilaDetalle
               etiqueta="Coordenadas"
               valor={`${contenedorSeleccionado.latitud.toFixed(6)}, ${contenedorSeleccionado.longitud.toFixed(6)}`}
+            />
+            <FilaDetalle
+              etiqueta="Dirección"
+              valor={contenedorSeleccionado.direccion_completa || 'Pendiente de identificar'}
             />
             <FilaDetalle
               etiqueta="Distancia"

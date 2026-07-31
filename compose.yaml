@@ -13,6 +13,10 @@ services:
       VIC_TOKEN_EXPIRATION_MINUTES: ${VIC_TOKEN_EXPIRATION_MINUTES:-1440}
       VIC_CORS_ORIGINS: ${VIC_CORS_ORIGINS:-*}
       VIC_ROOT_PATH: /api
+      VIC_ROUTING_URL: ${VIC_ROUTING_URL:-https://router.project-osrm.org}
+      VIC_GEOCODING_URL: ${VIC_GEOCODING_URL:-https://nominatim.openstreetmap.org}
+      VIC_EVIDENCE_DIR: /data/evidencias
+      VIC_EVIDENCE_PUBLIC_URL: /evidencias
     volumes:
       - vic_data:/data
     ports:

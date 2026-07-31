@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { StyleSheet, View } from 'react-native';
 
@@ -11,32 +11,54 @@ const REGION_INICIAL = {
   longitudeDelta: 0.05,
 };
 
-export function MapaRuta({ paradas = [], ubicacionRecolector = null }) {
+const coloresPunto = {
+  inicio: '#2196F3',
+  paso: '#FF9800',
+  fin: '#673AB7',
+};
+
+export function MapaRuta({
+  paradas = [],
+  puntos = [],
+  geometria = [],
+  ubicacionRecolector = null,
+  alAgregarPunto = null,
+  alEliminarPunto = null,
+  alto = 300,
+}) {
   const mapa = useRef(null);
-  const coordenadas = paradas.map((parada) => ({
-    latitude: parada.latitud,
-    longitude: parada.longitud,
+  const puntosVisibles = puntos.length > 0 ? puntos : paradas;
+  const coordenadasPuntos = puntosVisibles.map((punto) => ({
+    latitude: punto.latitud,
+    longitude: punto.longitud,
   }));
+  const coordenadasRuta = useMemo(
+    () =>
+      (geometria.length > 0 ? geometria : puntosVisibles).map((punto) => ({
+        latitude: punto.latitud,
+        longitude: punto.longitud,
+      })),
+    [geometria, puntosVisibles],
+  );
 
   useEffect(() => {
-    if (!mapa.current || !ubicacionRecolector) {
-      return;
+    const todas = [
+      ...coordenadasRuta,
+      ...(ubicacionRecolector ? [ubicacionRecolector] : []),
+    ];
+    if (mapa.current && todas.length > 1) {
+      mapa.current.fitToCoordinates(todas, {
+        edgePadding: { top: 45, right: 45, bottom: 45, left: 45 },
+        animated: true,
+      });
     }
-    mapa.current.animateToRegion(
-      {
-        latitude: ubicacionRecolector.latitude,
-        longitude: ubicacionRecolector.longitude,
-        latitudeDelta: 0.02,
-        longitudeDelta: 0.02,
-      },
-      500,
-    );
-  }, [ubicacionRecolector?.latitude, ubicacionRecolector?.longitude]);
+  }, [geometria, puntosVisibles.length]);
 
-  const inicial = ubicacionRecolector || coordenadas[0] || REGION_INICIAL;
+  const inicial =
+    ubicacionRecolector || coordenadasPuntos[0] || coordenadasRuta[0] || REGION_INICIAL;
 
   return (
-    <View style={estilos.contenedor}>
+    <View style={[estilos.contenedor, { height: alto }]}>
       <MapView
         ref={mapa}
         provider={PROVIDER_GOOGLE}
@@ -47,22 +69,39 @@ export function MapaRuta({ paradas = [], ubicacionRecolector = null }) {
           latitudeDelta: 0.04,
           longitudeDelta: 0.04,
         }}
+        onLongPress={
+          alAgregarPunto
+            ? (evento) => alAgregarPunto(evento.nativeEvent.coordinate)
+            : undefined
+        }
       >
-        {coordenadas.length > 1 ? (
+        {coordenadasRuta.length > 1 ? (
           <Polyline
-            coordinates={coordenadas}
+            coordinates={coordenadasRuta}
             strokeColor={colores.primary}
             strokeWidth={5}
           />
         ) : null}
-        {paradas.map((parada) => (
+        {puntosVisibles.map((punto, indice) => (
           <Marker
-            key={parada.id}
-            coordinate={{ latitude: parada.latitud, longitude: parada.longitud }}
-            title={`${parada.orden}. ${parada.codigo_qr}`}
-            description={parada.estado}
+            key={punto.id || `${punto.tipo || 'parada'}-${indice}`}
+            coordinate={{ latitude: punto.latitud, longitude: punto.longitud }}
+            title={
+              punto.tipo === 'paso'
+                ? `Punto de paso ${indice + 1}`
+                : `${punto.orden || indice + 1}. ${punto.codigo_qr || punto.tipo || 'Parada'}`
+            }
+            description={
+              punto.direccion || punto.estado || 'Mantén presionado para agregar puntos'
+            }
             pinColor={
-              parada.estado === 'pendiente' ? colores.secondary : colores.primary
+              coloresPunto[punto.tipo]
+              || (punto.estado === 'pendiente' ? colores.secondary : colores.primary)
+            }
+            onPress={
+              punto.tipo === 'paso' && alEliminarPunto
+                ? () => alEliminarPunto(indice)
+                : undefined
             }
           />
         ))}
@@ -80,7 +119,6 @@ export function MapaRuta({ paradas = [], ubicacionRecolector = null }) {
 
 const estilos = StyleSheet.create({
   contenedor: {
-    height: 300,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: colores.border,

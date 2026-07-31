@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -7,12 +7,25 @@ import {
   Text,
   View,
 } from 'react-native';
-import { CalendarClock, Check, MapPin, Pencil, Power, Route } from 'lucide-react-native';
+import {
+  ArrowDown,
+  ArrowUp,
+  CalendarClock,
+  Check,
+  MapPin,
+  Pencil,
+  Power,
+  Route,
+  Search,
+  Trash2,
+  Truck,
+} from 'lucide-react-native';
 
 import { Boton } from '../componentes/Boton';
 import { CampoTexto } from '../componentes/CampoTexto';
 import { conexionApi, obtenerMensajeErrorApi } from '../componentes/conexionApi';
 import { usarSesion } from '../componentes/ContextoSesion';
+import { MapaRuta } from '../componentes/MapaRuta';
 import { PanelRecorrido } from '../componentes/PanelRecorrido';
 import { PantallaBase } from '../componentes/PantallaBase';
 import { colores, espaciado } from '../componentes/tema';
@@ -27,9 +40,7 @@ const dias = [
   { id: 'sabado', etiqueta: 'Sáb' },
   { id: 'domingo', etiqueta: 'Dom' },
 ];
-
 const nombresDia = Object.fromEntries(dias.map((dia) => [dia.id, dia.etiqueta]));
-
 const formularioInicial = {
   nombre: '',
   zona: '',
@@ -38,19 +49,24 @@ const formularioInicial = {
   descripcion: '',
 };
 
+function textoDistancia(valor) {
+  if (valor == null) return 'Sin distancia';
+  return valor >= 1000 ? `${(valor / 1000).toFixed(1)} km` : `${Math.round(valor)} m`;
+}
+
 export function PantallaRutas() {
   const { usuario } = usarSesion();
   const esAdmin = usuario?.rol === 'admin';
-  const {
-    contenedores,
-    cargando: cargandoContenedores,
-    error: errorContenedores,
-  } = usarContenedores();
+  const { contenedores, cargando: cargandoContenedores } = usarContenedores();
   const [formulario, cambiarFormulario] = useState(formularioInicial);
-  const [contenedorIds, cambiarContenedorIds] = useState([]);
+  const [puntosRuta, cambiarPuntosRuta] = useState([]);
   const [rutas, cambiarRutas] = useState([]);
   const [recolectores, cambiarRecolectores] = useState([]);
+  const [vehiculos, cambiarVehiculos] = useState([]);
   const [recolectorId, cambiarRecolectorId] = useState(null);
+  const [vehiculoId, cambiarVehiculoId] = useState(null);
+  const [optimizar, cambiarOptimizar] = useState(false);
+  const [direccionBusqueda, cambiarDireccionBusqueda] = useState('');
   const [rutaEditandoId, cambiarRutaEditandoId] = useState(null);
   const [cargandoRutas, cambiarCargandoRutas] = useState(true);
   const [guardando, cambiarGuardando] = useState(false);
@@ -58,23 +74,32 @@ export function PantallaRutas() {
   const [error, cambiarError] = useState('');
   const [exito, cambiarExito] = useState('');
 
+  const contenedorIds = useMemo(
+    () =>
+      puntosRuta
+        .filter((punto) => punto.tipo === 'contenedor')
+        .map((punto) => punto.contenedor_id),
+    [puntosRuta],
+  );
+
   const cargarRutas = useCallback(async () => {
     try {
       cambiarCargandoRutas(true);
       cambiarError('');
       const solicitudes = [conexionApi.get('/rutas/mias')];
       if (esAdmin) {
-        solicitudes.push(conexionApi.get('/administracion/recolectores'));
+        solicitudes.push(
+          conexionApi.get('/administracion/recolectores'),
+          conexionApi.get('/administracion/vehiculos'),
+        );
       }
-      const [respuestaRutas, respuestaRecolectores] = await Promise.all(solicitudes);
+      const [respuestaRutas, respuestaRecolectores, respuestaVehiculos] =
+        await Promise.all(solicitudes);
       cambiarRutas(respuestaRutas.data);
-      if (respuestaRecolectores) {
-        cambiarRecolectores(respuestaRecolectores.data);
-      }
+      cambiarRecolectores(respuestaRecolectores?.data || []);
+      cambiarVehiculos(respuestaVehiculos?.data || []);
     } catch (excepcion) {
-      cambiarError(
-        obtenerMensajeErrorApi(excepcion, 'No fue posible cargar las rutas.'),
-      );
+      cambiarError(obtenerMensajeErrorApi(excepcion, 'No fue posible cargar las rutas.'));
     } finally {
       cambiarCargandoRutas(false);
     }
@@ -84,23 +109,130 @@ export function PantallaRutas() {
     cargarRutas();
   }, [cargarRutas]);
 
-  function cambiarCampo(campo, valor) {
-    cambiarFormulario((actual) => ({ ...actual, [campo]: valor }));
-  }
-
-  function alternarContenedor(id) {
-    cambiarContenedorIds((actuales) =>
-      actuales.includes(id)
-        ? actuales.filter((actual) => actual !== id)
-        : [...actuales, id],
-    );
-  }
-
   function limpiarFormulario() {
     cambiarFormulario(formularioInicial);
-    cambiarContenedorIds([]);
+    cambiarPuntosRuta([]);
     cambiarRecolectorId(null);
+    cambiarVehiculoId(null);
+    cambiarOptimizar(false);
+    cambiarDireccionBusqueda('');
     cambiarRutaEditandoId(null);
+  }
+
+  function alternarContenedor(contenedor) {
+    cambiarPuntosRuta((actuales) => {
+      const existe = actuales.some(
+        (punto) =>
+          punto.tipo === 'contenedor' && punto.contenedor_id === contenedor.id,
+      );
+      if (existe) {
+        return actuales.filter(
+          (punto) =>
+            !(punto.tipo === 'contenedor' && punto.contenedor_id === contenedor.id),
+        );
+      }
+      return [
+        ...actuales,
+        {
+          id: `contenedor-${contenedor.id}`,
+          tipo: 'contenedor',
+          contenedor_id: contenedor.id,
+          latitud: contenedor.latitud,
+          longitud: contenedor.longitud,
+          direccion: contenedor.direccion_completa || null,
+        },
+      ];
+    });
+  }
+
+  async function resolverDireccion(latitud, longitud) {
+    try {
+      const respuesta = await conexionApi.get('/geografia/direccion', {
+        params: { latitud, longitud },
+      });
+      return respuesta.data.direccion_completa;
+    } catch {
+      return null;
+    }
+  }
+
+  async function agregarPuntoMapa(coordenada) {
+    const direccion = await resolverDireccion(
+      coordenada.latitude,
+      coordenada.longitude,
+    );
+    cambiarPuntosRuta((actuales) => [
+      ...actuales,
+      {
+        id: `paso-${Date.now()}`,
+        tipo: 'paso',
+        contenedor_id: null,
+        latitud: coordenada.latitude,
+        longitud: coordenada.longitude,
+        direccion,
+      },
+    ]);
+  }
+
+  async function agregarDireccion() {
+    if (direccionBusqueda.trim().length < 3) {
+      cambiarError('Escribe al menos tres caracteres de la dirección.');
+      return;
+    }
+    try {
+      cambiarGuardando(true);
+      const respuesta = await conexionApi.get('/geografia/buscar', {
+        params: { texto: direccionBusqueda.trim(), limite: 1 },
+      });
+      if (!respuesta.data.length) {
+        cambiarError('No se encontró esa dirección.');
+        return;
+      }
+      const resultado = respuesta.data[0];
+      cambiarPuntosRuta((actuales) => [
+        ...actuales,
+        {
+          id: `direccion-${Date.now()}`,
+          tipo: 'paso',
+          contenedor_id: null,
+          latitud: resultado.latitud,
+          longitud: resultado.longitud,
+          direccion: resultado.direccion_completa,
+        },
+      ]);
+      cambiarDireccionBusqueda('');
+      cambiarError('');
+    } catch (excepcion) {
+      cambiarError(
+        obtenerMensajeErrorApi(excepcion, 'No fue posible buscar la dirección.'),
+      );
+    } finally {
+      cambiarGuardando(false);
+    }
+  }
+
+  function moverPunto(indice, desplazamiento) {
+    cambiarPuntosRuta((actuales) => {
+      const destino = indice + desplazamiento;
+      if (destino < 0 || destino >= actuales.length) return actuales;
+      const copia = [...actuales];
+      [copia[indice], copia[destino]] = [copia[destino], copia[indice]];
+      return copia;
+    });
+  }
+
+  function eliminarPunto(indice) {
+    cambiarPuntosRuta((actuales) => actuales.filter((_, posicion) => posicion !== indice));
+  }
+
+  function cambiarTipoPunto(indice) {
+    cambiarPuntosRuta((actuales) =>
+      actuales.map((punto, posicion) => {
+        if (posicion !== indice || punto.tipo === 'contenedor') return punto;
+        const siguiente = punto.tipo === 'paso' ? 'inicio' : punto.tipo === 'inicio' ? 'fin' : 'paso';
+        return { ...punto, tipo: siguiente };
+      }),
+    );
   }
 
   function editarRuta(ruta) {
@@ -111,8 +243,20 @@ export function PantallaRutas() {
       hora_aproximada: ruta.hora_aproximada,
       descripcion: ruta.descripcion || '',
     });
-    cambiarContenedorIds(ruta.contenedores.map((contenedor) => contenedor.id));
+    cambiarPuntosRuta(
+      (ruta.puntos_ruta.length ? ruta.puntos_ruta : ruta.contenedores).map(
+        (punto, indice) => ({
+          id: punto.id || `contenedor-${punto.contenedor_id || punto.id}-${indice}`,
+          tipo: punto.tipo || 'contenedor',
+          contenedor_id: punto.contenedor_id || (punto.tipo ? null : punto.id),
+          latitud: punto.latitud,
+          longitud: punto.longitud,
+          direccion: punto.direccion || null,
+        }),
+      ),
+    );
     cambiarRecolectorId(ruta.recolector?.id || null);
+    cambiarVehiculoId(ruta.vehiculo?.id || null);
     cambiarRutaEditandoId(ruta.id);
     cambiarError('');
     cambiarExito('');
@@ -135,7 +279,6 @@ export function PantallaRutas() {
       cambiarError('Selecciona el recolector responsable.');
       return;
     }
-
     const datos = {
       ...formulario,
       nombre: formulario.nombre.trim(),
@@ -143,25 +286,31 @@ export function PantallaRutas() {
       descripcion: formulario.descripcion.trim() || null,
       contenedor_ids: contenedorIds,
       recolector_id: esAdmin ? recolectorId : undefined,
+      vehiculo_id: esAdmin ? vehiculoId : undefined,
+      optimizar_orden: optimizar,
+      puntos_ruta: puntosRuta.map((punto) => ({
+        tipo: punto.tipo,
+        contenedor_id: punto.tipo === 'contenedor' ? punto.contenedor_id : null,
+        latitud: punto.latitud,
+        longitud: punto.longitud,
+        direccion: punto.direccion || null,
+      })),
     };
-
     try {
       cambiarGuardando(true);
       cambiarError('');
       cambiarExito('');
       if (rutaEditandoId) {
         await conexionApi.patch(`/rutas/${rutaEditandoId}`, datos);
-        cambiarExito('Ruta actualizada. El calendario ya muestra el nuevo horario.');
+        cambiarExito('Ruta actualizada y recalculada sobre calles.');
       } else {
         await conexionApi.post('/rutas', datos);
-        cambiarExito('Ruta creada. Ya está visible en el calendario semanal.');
+        cambiarExito('Ruta creada y publicada en el calendario.');
       }
       limpiarFormulario();
       await cargarRutas();
     } catch (excepcion) {
-      cambiarError(
-        obtenerMensajeErrorApi(excepcion, 'No fue posible guardar la ruta.'),
-      );
+      cambiarError(obtenerMensajeErrorApi(excepcion, 'No fue posible guardar la ruta.'));
     } finally {
       cambiarGuardando(false);
     }
@@ -170,7 +319,6 @@ export function PantallaRutas() {
   async function alternarEstado(ruta) {
     try {
       cambiarActualizandoId(ruta.id);
-      cambiarError('');
       await conexionApi.patch(`/rutas/${ruta.id}`, { activa: !ruta.activa });
       await cargarRutas();
     } catch (excepcion) {
@@ -190,9 +338,9 @@ export function PantallaRutas() {
           <Route color={colores.white} size={28} />
         </View>
         <View style={estilos.flexible}>
-          <Text style={estilos.titulo}>Rutas de recolección</Text>
+          <Text style={estilos.titulo}>Rutas por calles reales</Text>
           <Text style={estilos.subtitulo}>
-            Define el recorrido, el día y la hora aproximada de paso.
+            Ordena paradas, agrega puntos de paso y asigna la placa.
           </Text>
         </View>
       </View>
@@ -201,45 +349,43 @@ export function PantallaRutas() {
         <PanelRecorrido rutas={rutas} alActualizarRutas={cargarRutas} />
       ) : null}
 
-      <View style={estilos.tarjetaFormulario}>
+      <View style={estilos.tarjeta}>
         <View style={estilos.filaTitulo}>
           <CalendarClock color={colores.primary} size={23} />
           <Text style={estilos.tituloSeccion}>
             {rutaEditandoId ? 'Editar ruta' : 'Crear ruta semanal'}
           </Text>
         </View>
-
         <CampoTexto
           etiqueta="Nombre de la ruta"
-          placeholder="Ej. Ruta Centro"
           value={formulario.nombre}
-          onChangeText={(valor) => cambiarCampo('nombre', valor)}
+          placeholder="Ej. Ruta Centro"
+          onChangeText={(valor) => cambiarFormulario((actual) => ({ ...actual, nombre: valor }))}
         />
         <CampoTexto
           etiqueta="Zona o colonia"
-          placeholder="Ej. Barrio Centro"
           value={formulario.zona}
-          onChangeText={(valor) => cambiarCampo('zona', valor)}
+          placeholder="Ej. Centro"
+          onChangeText={(valor) => cambiarFormulario((actual) => ({ ...actual, zona: valor }))}
         />
-
         <View style={estilos.campo}>
           <Text style={estilos.etiqueta}>Día de recolección</Text>
-          <View style={estilos.dias}>
+          <View style={estilos.chips}>
             {dias.map((dia) => (
               <Pressable
-                accessibilityRole="button"
                 key={dia.id}
-                onPress={() => cambiarCampo('dia_semana', dia.id)}
+                onPress={() =>
+                  cambiarFormulario((actual) => ({ ...actual, dia_semana: dia.id }))
+                }
                 style={[
-                  estilos.dia,
-                  formulario.dia_semana === dia.id && estilos.diaSeleccionado,
+                  estilos.chip,
+                  formulario.dia_semana === dia.id && estilos.chipActivo,
                 ]}
               >
                 <Text
                   style={[
-                    estilos.textoDia,
-                    formulario.dia_semana === dia.id &&
-                      estilos.textoDiaSeleccionado,
+                    estilos.textoChip,
+                    formulario.dia_semana === dia.id && estilos.textoChipActivo,
                   ]}
                 >
                   {dia.etiqueta}
@@ -248,103 +394,75 @@ export function PantallaRutas() {
             ))}
           </View>
         </View>
-
         <CampoTexto
-          etiqueta="Hora aproximada (24 h)"
-          placeholder="08:30"
+          etiqueta="Hora aproximada"
           value={formulario.hora_aproximada}
-          keyboardType="numbers-and-punctuation"
+          placeholder="08:30"
           maxLength={5}
-          onChangeText={(valor) => cambiarCampo('hora_aproximada', valor)}
+          onChangeText={(valor) =>
+            cambiarFormulario((actual) => ({ ...actual, hora_aproximada: valor }))
+          }
         />
         <CampoTexto
-          etiqueta="Indicaciones (opcional)"
-          placeholder="Punto de inicio o referencias"
+          etiqueta="Indicaciones"
           value={formulario.descripcion}
           multiline
-          onChangeText={(valor) => cambiarCampo('descripcion', valor)}
-          estilo={estilos.descripcion}
+          onChangeText={(valor) =>
+            cambiarFormulario((actual) => ({ ...actual, descripcion: valor }))
+          }
         />
 
         {esAdmin ? (
-          <View style={estilos.campo}>
-            <Text style={estilos.etiqueta}>Recolector responsable</Text>
-            <Text style={estilos.ayuda}>
-              Solo el personal activo puede recibir una ruta.
-            </Text>
-            <View style={estilos.dias}>
-              {recolectores.map((recolector) => (
-                <Pressable
-                  accessibilityRole="button"
-                  key={recolector.id}
-                  onPress={() => cambiarRecolectorId(recolector.id)}
-                  style={[
-                    estilos.recolector,
-                    recolectorId === recolector.id &&
-                      estilos.recolectorSeleccionado,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      estilos.textoRecolector,
-                      recolectorId === recolector.id &&
-                        estilos.textoRecolectorSeleccionado,
-                    ]}
-                  >
-                    {recolector.nombre} {recolector.apellidos}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
+          <>
+            <Selector
+              titulo="Recolector responsable"
+              elementos={recolectores}
+              seleccionado={recolectorId}
+              alSeleccionar={cambiarRecolectorId}
+              etiqueta={(item) => `${item.nombre} ${item.apellidos}`}
+            />
+            <Selector
+              titulo="Vehículo (solo placa)"
+              elementos={vehiculos.filter((vehiculo) => vehiculo.activo)}
+              seleccionado={vehiculoId}
+              alSeleccionar={cambiarVehiculoId}
+              etiqueta={(item) => item.placa}
+              icono={<Truck color={colores.primary} size={18} />}
+              permiteVaciar
+            />
+          </>
         ) : null}
 
         <View style={estilos.campo}>
-          <Text style={estilos.etiqueta}>Contenedores del recorrido</Text>
+          <Text style={estilos.etiqueta}>Contenedores</Text>
           <Text style={estilos.ayuda}>
-            Selecciona los puntos en el orden en que pasarás.
+            Selecciónalos en el orden de visita; después puedes moverlos.
           </Text>
           {cargandoContenedores ? (
             <ActivityIndicator color={colores.primary} />
-          ) : errorContenedores ? (
-            <Text style={estilos.error}>{errorContenedores}</Text>
-          ) : contenedores.length === 0 ? (
-            <Text style={estilos.vacio}>
-              Primero registra al menos un contenedor desde el mapa.
-            </Text>
           ) : (
-            <View style={estilos.listaContenedores}>
+            <View style={estilos.listaCompacta}>
               {contenedores.map((contenedor) => {
                 const seleccionado = contenedorIds.includes(contenedor.id);
-                const orden = contenedorIds.indexOf(contenedor.id) + 1;
                 return (
                   <Pressable
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: seleccionado }}
                     key={contenedor.id}
-                    onPress={() => alternarContenedor(contenedor.id)}
+                    onPress={() => alternarContenedor(contenedor)}
                     style={[
-                      estilos.contenedor,
-                      seleccionado && estilos.contenedorSeleccionado,
+                      estilos.itemSeleccion,
+                      seleccionado && estilos.itemSeleccionado,
                     ]}
                   >
-                    <View
-                      style={[
-                        estilos.casilla,
-                        seleccionado && estilos.casillaSeleccionada,
-                      ]}
-                    >
-                      {seleccionado ? <Text style={estilos.orden}>{orden}</Text> : null}
+                    <View style={[estilos.casilla, seleccionado && estilos.casillaActiva]}>
+                      {seleccionado ? <Check color={colores.white} size={15} /> : null}
                     </View>
                     <View style={estilos.flexible}>
-                      <Text numberOfLines={1} style={estilos.codigo}>
-                        {contenedor.codigo_qr}
-                      </Text>
-                      <Text style={estilos.coordenadas}>
-                        {contenedor.latitud.toFixed(5)}, {contenedor.longitud.toFixed(5)}
+                      <Text style={estilos.itemTitulo}>{contenedor.codigo_qr}</Text>
+                      <Text numberOfLines={1} style={estilos.itemDetalle}>
+                        {contenedor.direccion_completa
+                          || `${contenedor.latitud.toFixed(5)}, ${contenedor.longitud.toFixed(5)}`}
                       </Text>
                     </View>
-                    {seleccionado ? <Check color={colores.primary} size={20} /> : null}
                   </Pressable>
                 );
               })}
@@ -352,20 +470,100 @@ export function PantallaRutas() {
           )}
         </View>
 
+        <View style={estilos.campo}>
+          <Text style={estilos.etiqueta}>Agregar punto por dirección</Text>
+          <View style={estilos.busqueda}>
+            <View style={estilos.flexible}>
+              <CampoTexto
+                value={direccionBusqueda}
+                placeholder="Calle, colonia, Querétaro"
+                onChangeText={cambiarDireccionBusqueda}
+              />
+            </View>
+            <Pressable onPress={agregarDireccion} style={estilos.botonIcono}>
+              <Search color={colores.white} size={20} />
+            </Pressable>
+          </View>
+          <Text style={estilos.ayuda}>
+            También puedes tocar el mapa para agregar un punto por donde debe pasar.
+          </Text>
+          <MapaRuta
+            puntos={puntosRuta}
+            alAgregarPunto={agregarPuntoMapa}
+            alEliminarPunto={eliminarPunto}
+            alto={340}
+          />
+        </View>
+
+        {puntosRuta.length > 0 ? (
+          <View style={estilos.campo}>
+            <Text style={estilos.etiqueta}>Secuencia del recorrido</Text>
+            {puntosRuta.map((punto, indice) => (
+              <View key={punto.id || indice} style={estilos.puntoFila}>
+                <View style={estilos.numero}><Text style={estilos.numeroTexto}>{indice + 1}</Text></View>
+                <View style={estilos.flexible}>
+                  <Text style={estilos.itemTitulo}>
+                    {punto.tipo === 'contenedor'
+                      ? `Contenedor ${punto.contenedor_id}`
+                      : punto.tipo === 'inicio'
+                        ? 'Punto inicial'
+                        : punto.tipo === 'fin'
+                          ? 'Punto final'
+                          : 'Punto de paso'}
+                  </Text>
+                  <Text numberOfLines={1} style={estilos.itemDetalle}>
+                    {punto.direccion || `${punto.latitud.toFixed(5)}, ${punto.longitud.toFixed(5)}`}
+                  </Text>
+                </View>
+                {punto.tipo !== 'contenedor' ? (
+                  <Pressable onPress={() => cambiarTipoPunto(indice)} style={estilos.tipoPunto}>
+                    <Text style={estilos.tipoPuntoTexto}>{punto.tipo}</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable disabled={indice === 0} onPress={() => moverPunto(indice, -1)}>
+                  <ArrowUp color={indice === 0 ? colores.border : colores.primary} size={20} />
+                </Pressable>
+                <Pressable
+                  disabled={indice === puntosRuta.length - 1}
+                  onPress={() => moverPunto(indice, 1)}
+                >
+                  <ArrowDown
+                    color={indice === puntosRuta.length - 1 ? colores.border : colores.primary}
+                    size={20}
+                  />
+                </Pressable>
+                <Pressable onPress={() => eliminarPunto(indice)}>
+                  <Trash2 color={colores.danger} size={19} />
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        <Pressable
+          onPress={() => cambiarOptimizar((valor) => !valor)}
+          style={[estilos.optimizar, optimizar && estilos.optimizarActivo]}
+        >
+          <View style={[estilos.casilla, optimizar && estilos.casillaActiva]}>
+            {optimizar ? <Check color={colores.white} size={15} /> : null}
+          </View>
+          <View style={estilos.flexible}>
+            <Text style={estilos.itemTitulo}>Optimizar orden automáticamente</Text>
+            <Text style={estilos.itemDetalle}>
+              Se conserva el orden manual si agregaste puntos de paso.
+            </Text>
+          </View>
+        </Pressable>
+
         {error ? <Text style={estilos.error}>{error}</Text> : null}
         {exito ? <Text style={estilos.exito}>{exito}</Text> : null}
-
         <Boton
-          texto={rutaEditandoId ? 'Guardar cambios' : 'Crear ruta'}
+          texto={rutaEditandoId ? 'Guardar y recalcular' : 'Crear y calcular ruta'}
           cargando={guardando}
           alPresionar={guardarRuta}
         />
         {rutaEditandoId ? (
-          <Boton
-            texto="Cancelar edición"
-            variante="fantasma"
-            alPresionar={limpiarFormulario}
-          />
+          <Boton texto="Cancelar edición" variante="fantasma" alPresionar={limpiarFormulario} />
         ) : null}
       </View>
 
@@ -373,271 +571,143 @@ export function PantallaRutas() {
         <MapPin color={colores.primary} size={22} />
         <Text style={estilos.tituloSeccion}>Rutas programadas</Text>
       </View>
-
       {cargandoRutas ? (
         <ActivityIndicator color={colores.primary} size="large" />
       ) : rutas.length === 0 ? (
-        <View style={estilos.vacioTarjeta}>
-          <Text style={estilos.vacioTitulo}>Aún no hay rutas</Text>
-          <Text style={estilos.vacio}>Crea la primera agenda semanal arriba.</Text>
-        </View>
+        <View style={estilos.tarjeta}><Text style={estilos.ayuda}>Aún no hay rutas.</Text></View>
       ) : (
-        <View style={estilos.listaRutas}>
-          {rutas.map((ruta) => (
-            <View
-              key={ruta.id}
-              style={[estilos.ruta, !ruta.activa && estilos.rutaInactiva]}
-            >
-              <View style={estilos.rutaEncabezado}>
-                <View style={estilos.flexible}>
-                  <Text style={estilos.rutaNombre}>{ruta.nombre}</Text>
-                  <Text style={estilos.rutaHorario}>
-                    {nombresDia[ruta.dia_semana]} · {ruta.hora_aproximada} · {ruta.zona}
-                  </Text>
-                </View>
-                <View style={[estilos.estado, !ruta.activa && estilos.estadoInactivo]}>
-                  <Text style={estilos.textoEstado}>
-                    {ruta.activa ? 'Activa' : 'Pausada'}
-                  </Text>
-                </View>
-              </View>
-              <Text style={estilos.rutaDetalle}>
-                {ruta.contenedores.length}{' '}
-                {ruta.contenedores.length === 1 ? 'contenedor' : 'contenedores'}
-                {ruta.descripcion ? ` · ${ruta.descripcion}` : ''}
-              </Text>
-              <Text style={estilos.recolectorAsignado}>
-                Responsable:{' '}
-                {ruta.recolector
-                  ? `${ruta.recolector.nombre} ${ruta.recolector.apellidos}`
-                  : 'Sin asignar'}
-              </Text>
-              {ruta.operacion ? (
-                <Text style={estilos.operacion}>
-                  Último recorrido: {ruta.operacion.estado} ·{' '}
-                  {ruta.operacion.progreso_porcentaje}%
+        rutas.map((ruta) => (
+          <View key={ruta.id} style={[estilos.tarjeta, !ruta.activa && estilos.inactiva]}>
+            <View style={estilos.filaTitulo}>
+              <View style={estilos.flexible}>
+                <Text style={estilos.rutaNombre}>{ruta.nombre}</Text>
+                <Text style={estilos.itemDetalle}>
+                  {nombresDia[ruta.dia_semana]} · {ruta.hora_aproximada} · {ruta.zona}
                 </Text>
-              ) : null}
-              <View style={estilos.accionesRuta}>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => editarRuta(ruta)}
-                  style={estilos.botonRuta}
-                >
-                  <Pencil color={colores.primary} size={17} />
-                  <Text style={estilos.textoBotonRuta}>Editar</Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={actualizandoId === ruta.id}
-                  onPress={() => alternarEstado(ruta)}
-                  style={estilos.botonRuta}
-                >
-                  {actualizandoId === ruta.id ? (
-                    <ActivityIndicator color={colores.secondary} />
-                  ) : (
-                    <Power color={colores.secondary} size={17} />
-                  )}
-                  <Text
-                    style={[
-                      estilos.textoBotonRuta,
-                      { color: colores.secondary },
-                    ]}
-                  >
-                    {ruta.activa ? 'Pausar' : 'Activar'}
-                  </Text>
-                </Pressable>
               </View>
+              <Text style={estilos.estado}>{ruta.activa ? 'Activa' : 'Pausada'}</Text>
             </View>
-          ))}
-        </View>
+            <Text style={estilos.rutaDato}>
+              {textoDistancia(ruta.distancia_m)} · {ruta.duracion_minutos || 0} min ·{' '}
+              {ruta.contenedores.length} paradas
+            </Text>
+            <Text style={estilos.rutaDato}>
+              Recolector: {ruta.recolector ? `${ruta.recolector.nombre} ${ruta.recolector.apellidos}` : 'Sin asignar'}
+              {' · '}Placa: {ruta.vehiculo?.placa || 'Sin vehículo'}
+            </Text>
+            {ruta.estado_calculo_ruta !== 'calculada' ? (
+              <Text style={estilos.aviso}>
+                Recorrido de respaldo: {ruta.detalle_calculo_ruta || 'recalcula cuando haya conexión'}
+              </Text>
+            ) : null}
+            <MapaRuta
+              puntos={ruta.puntos_ruta}
+              geometria={ruta.geometria}
+              alto={260}
+            />
+            <View style={estilos.acciones}>
+              <Pressable onPress={() => editarRuta(ruta)} style={estilos.botonSecundario}>
+                <Pencil color={colores.primary} size={17} />
+                <Text style={estilos.botonSecundarioTexto}>Editar</Text>
+              </Pressable>
+              <Pressable
+                disabled={actualizandoId === ruta.id}
+                onPress={() => alternarEstado(ruta)}
+                style={estilos.botonSecundario}
+              >
+                <Power color={colores.secondary} size={17} />
+                <Text style={[estilos.botonSecundarioTexto, { color: colores.secondary }]}>
+                  {ruta.activa ? 'Pausar' : 'Activar'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ))
       )}
     </PantallaBase>
   );
 }
 
+function Selector({
+  titulo,
+  elementos,
+  seleccionado,
+  alSeleccionar,
+  etiqueta,
+  icono = null,
+  permiteVaciar = false,
+}) {
+  return (
+    <View style={estilos.campo}>
+      <View style={estilos.filaTitulo}>{icono}<Text style={estilos.etiqueta}>{titulo}</Text></View>
+      <View style={estilos.chips}>
+        {permiteVaciar ? (
+          <Pressable
+            onPress={() => alSeleccionar(null)}
+            style={[estilos.chip, seleccionado == null && estilos.chipActivo]}
+          >
+            <Text style={[estilos.textoChip, seleccionado == null && estilos.textoChipActivo]}>
+              Sin asignar
+            </Text>
+          </Pressable>
+        ) : null}
+        {elementos.map((item) => (
+          <Pressable
+            key={item.id}
+            onPress={() => alSeleccionar(item.id)}
+            style={[estilos.chip, seleccionado === item.id && estilos.chipActivo]}
+          >
+            <Text style={[estilos.textoChip, seleccionado === item.id && estilos.textoChipActivo]}>
+              {etiqueta(item)}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 const estilos = StyleSheet.create({
+  encabezado: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 },
+  iconoEncabezado: { width: 54, height: 54, borderRadius: 18, backgroundColor: colores.primary, alignItems: 'center', justifyContent: 'center' },
   flexible: { flex: 1 },
-  encabezado: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: espaciado.md,
-    marginBottom: espaciado.xl,
-  },
-  iconoEncabezado: {
-    width: 54,
-    height: 54,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 17,
-    backgroundColor: colores.primary,
-  },
   titulo: { color: colores.text, fontSize: 26, fontWeight: '900' },
-  subtitulo: { color: colores.muted, fontSize: 14, lineHeight: 20 },
-  tarjetaFormulario: {
-    gap: espaciado.lg,
-    marginBottom: espaciado.xxl,
-    padding: espaciado.lg,
-    borderWidth: 1,
-    borderColor: colores.border,
-    borderRadius: 18,
-    backgroundColor: colores.surface,
-  },
-  filaTitulo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: espaciado.sm,
-    marginBottom: espaciado.md,
-  },
-  tituloSeccion: { color: colores.text, fontSize: 19, fontWeight: '900' },
-  campo: { gap: espaciado.sm },
+  subtitulo: { color: colores.muted, fontSize: 13, lineHeight: 19 },
+  tarjeta: { gap: 14, padding: 18, marginBottom: 18, borderWidth: 1, borderColor: colores.border, borderRadius: 20, backgroundColor: colores.white },
+  filaTitulo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tituloSeccion: { color: colores.text, fontSize: 18, fontWeight: '900' },
+  campo: { gap: 8 },
   etiqueta: { color: colores.text, fontSize: 14, fontWeight: '800' },
-  ayuda: { color: colores.muted, fontSize: 12, lineHeight: 17 },
-  dias: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  dia: {
-    minWidth: 42,
-    alignItems: 'center',
-    paddingHorizontal: 9,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: colores.border,
-    borderRadius: 11,
-    backgroundColor: colores.white,
-  },
-  diaSeleccionado: {
-    borderColor: colores.primary,
-    backgroundColor: colores.primary,
-  },
-  textoDia: { color: colores.text, fontSize: 12, fontWeight: '800' },
-  textoDiaSeleccionado: { color: colores.white },
-  recolector: {
-    paddingHorizontal: espaciado.md,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: colores.border,
-    borderRadius: 12,
-    backgroundColor: colores.white,
-  },
-  recolectorSeleccionado: {
-    borderColor: colores.primary,
-    backgroundColor: colores.primary,
-  },
-  textoRecolector: { color: colores.text, fontSize: 12, fontWeight: '800' },
-  textoRecolectorSeleccionado: { color: colores.white },
-  descripcion: {
-    minHeight: 82,
-    paddingTop: espaciado.md,
-    textAlignVertical: 'top',
-  },
-  listaContenedores: { gap: espaciado.sm },
-  contenedor: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: espaciado.sm,
-    padding: espaciado.md,
-    borderWidth: 1,
-    borderColor: colores.border,
-    borderRadius: 13,
-    backgroundColor: colores.white,
-  },
-  contenedorSeleccionado: {
-    borderColor: colores.primary,
-    backgroundColor: '#EAF7EE',
-  },
-  casilla: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: colores.border,
-    borderRadius: 9,
-  },
-  casillaSeleccionada: {
-    borderColor: colores.primary,
-    backgroundColor: colores.primary,
-  },
-  orden: { color: colores.white, fontSize: 12, fontWeight: '900' },
-  codigo: { color: colores.text, fontSize: 14, fontWeight: '900' },
-  coordenadas: { color: colores.muted, fontSize: 11 },
-  error: {
-    padding: espaciado.md,
-    color: colores.danger,
-    fontSize: 13,
-    borderRadius: 12,
-    backgroundColor: '#FFF1F0',
-  },
-  exito: {
-    padding: espaciado.md,
-    color: colores.primaryDark,
-    fontSize: 13,
-    fontWeight: '700',
-    borderRadius: 12,
-    backgroundColor: '#EAF7EE',
-  },
-  vacio: { color: colores.muted, fontSize: 13, lineHeight: 19 },
-  vacioTarjeta: {
-    alignItems: 'center',
-    gap: espaciado.xs,
-    padding: espaciado.xl,
-    borderWidth: 1,
-    borderColor: colores.border,
-    borderRadius: 16,
-    backgroundColor: colores.surface,
-  },
-  vacioTitulo: { color: colores.text, fontSize: 17, fontWeight: '900' },
-  listaRutas: { gap: espaciado.md },
-  ruta: {
-    gap: espaciado.md,
-    padding: espaciado.lg,
-    borderWidth: 1,
-    borderColor: colores.primary,
-    borderRadius: 16,
-    backgroundColor: '#F4FBF6',
-  },
-  rutaInactiva: {
-    opacity: 0.68,
-    borderColor: colores.border,
-    backgroundColor: colores.surface,
-  },
-  rutaEncabezado: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: espaciado.sm,
-  },
-  rutaNombre: { color: colores.text, fontSize: 17, fontWeight: '900' },
-  rutaHorario: {
-    marginTop: 3,
-    color: colores.primaryDark,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  rutaDetalle: { color: colores.muted, fontSize: 13, lineHeight: 19 },
-  recolectorAsignado: {
-    color: colores.primaryDark,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  operacion: { color: '#1769AA', fontSize: 12, fontWeight: '800' },
-  estado: {
-    paddingHorizontal: espaciado.sm,
-    paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: colores.primary,
-  },
-  estadoInactivo: { backgroundColor: colores.muted },
-  textoEstado: { color: colores.white, fontSize: 11, fontWeight: '900' },
-  accionesRuta: { flexDirection: 'row', gap: espaciado.sm },
-  botonRuta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: espaciado.md,
-    paddingVertical: espaciado.sm,
-    borderWidth: 1,
-    borderColor: colores.border,
-    borderRadius: 11,
-    backgroundColor: colores.white,
-  },
-  textoBotonRuta: { color: colores.primary, fontSize: 13, fontWeight: '900' },
+  ayuda: { color: colores.muted, fontSize: 12, lineHeight: 18 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: colores.border, borderRadius: 12, backgroundColor: colores.surface },
+  chipActivo: { borderColor: colores.primary, backgroundColor: colores.primary },
+  textoChip: { color: colores.text, fontSize: 12, fontWeight: '800' },
+  textoChipActivo: { color: colores.white },
+  listaCompacta: { gap: 8 },
+  itemSeleccion: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, borderWidth: 1, borderColor: colores.border, borderRadius: 14 },
+  itemSeleccionado: { borderColor: colores.primary, backgroundColor: '#F1F8F2' },
+  casilla: { width: 23, height: 23, borderWidth: 1, borderColor: colores.border, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
+  casillaActiva: { borderColor: colores.primary, backgroundColor: colores.primary },
+  itemTitulo: { color: colores.text, fontSize: 13, fontWeight: '800' },
+  itemDetalle: { color: colores.muted, fontSize: 11, lineHeight: 16 },
+  busqueda: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  botonIcono: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colores.primary },
+  puntoFila: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colores.border },
+  numero: { width: 27, height: 27, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colores.primary },
+  numeroTexto: { color: colores.white, fontSize: 12, fontWeight: '900' },
+  tipoPunto: { paddingHorizontal: 7, paddingVertical: 5, borderRadius: 8, backgroundColor: '#FFF3E0' },
+  tipoPuntoTexto: { color: '#E65100', fontSize: 10, fontWeight: '900' },
+  optimizar: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 13, borderWidth: 1, borderColor: colores.border, borderRadius: 14 },
+  optimizarActivo: { borderColor: colores.primary, backgroundColor: '#F1F8F2' },
+  error: { padding: 12, borderRadius: 10, color: colores.danger, backgroundColor: '#FFF0F0', fontWeight: '700' },
+  exito: { padding: 12, borderRadius: 10, color: colores.primary, backgroundColor: '#E8F5E9', fontWeight: '700' },
+  rutaNombre: { color: colores.text, fontSize: 18, fontWeight: '900' },
+  rutaDato: { color: colores.text, fontSize: 13, lineHeight: 19 },
+  estado: { color: colores.primary, fontSize: 12, fontWeight: '900' },
+  aviso: { padding: 10, borderRadius: 10, color: '#8A5800', backgroundColor: '#FFF8E1', fontSize: 12 },
+  acciones: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  botonSecundario: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: colores.border, borderRadius: 11 },
+  botonSecundarioTexto: { color: colores.primary, fontSize: 12, fontWeight: '900' },
+  inactiva: { opacity: 0.65 },
 });

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base_datos import Base
@@ -280,3 +280,106 @@ class IncidenciaOperativa(Base):
     latitud: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitud: Mapped[float | None] = mapped_column(Float, nullable=True)
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
+
+
+class DetalleContenedor(Base):
+    """Direccion legible separada para conservar bases de datos existentes."""
+
+    __tablename__ = "detalles_contenedor"
+
+    contenedor_id: Mapped[int] = mapped_column(
+        ForeignKey("contenedores.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    direccion_completa: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    calle: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    numero: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    colonia: Mapped[str | None] = mapped_column(String(140), nullable=True)
+    codigo_postal: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    municipio: Mapped[str | None] = mapped_column(String(140), nullable=True)
+    actualizado_en: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=ahora_utc,
+        onupdate=ahora_utc,
+        nullable=False,
+    )
+
+
+class Vehiculo(Base):
+    __tablename__ = "vehiculos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    placa: Mapped[str] = mapped_column(String(20), unique=True, index=True, nullable=False)
+    activo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
+    actualizado_en: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=ahora_utc,
+        onupdate=ahora_utc,
+        nullable=False,
+    )
+
+
+class ConfiguracionRutaVial(Base):
+    __tablename__ = "configuraciones_ruta_vial"
+
+    ruta_id: Mapped[int] = mapped_column(
+        ForeignKey("rutas_recoleccion.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    vehiculo_id: Mapped[int | None] = mapped_column(
+        ForeignKey("vehiculos.id"),
+        nullable=True,
+        index=True,
+    )
+    geometria_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    distancia_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    duracion_s: Mapped[float | None] = mapped_column(Float, nullable=True)
+    proveedor: Mapped[str] = mapped_column(String(40), default="sin_calcular", nullable=False)
+    estado_calculo: Mapped[str] = mapped_column(
+        String(30),
+        default="pendiente",
+        nullable=False,
+    )
+    detalle_calculo: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    calculado_en: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    actualizado_en: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=ahora_utc,
+        onupdate=ahora_utc,
+        nullable=False,
+    )
+
+
+class PuntoRuta(Base):
+    __tablename__ = "puntos_ruta"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    ruta_id: Mapped[int] = mapped_column(
+        ForeignKey("rutas_recoleccion.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    tipo: Mapped[str] = mapped_column(String(20), nullable=False)
+    orden: Mapped[int] = mapped_column(Integer, nullable=False)
+    contenedor_id: Mapped[int | None] = mapped_column(
+        ForeignKey("contenedores.id"),
+        nullable=True,
+    )
+    latitud: Mapped[float] = mapped_column(Float, nullable=False)
+    longitud: Mapped[float] = mapped_column(Float, nullable=False)
+    direccion: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    eta_minutos: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class RutaEjecucionVial(Base):
+    __tablename__ = "rutas_ejecucion_vial"
+
+    ejecucion_id: Mapped[int] = mapped_column(
+        ForeignKey("ejecuciones_ruta.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    geometria_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    distancia_restante_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    duracion_restante_s: Mapped[float | None] = mapped_column(Float, nullable=True)
+    recalculado_en: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

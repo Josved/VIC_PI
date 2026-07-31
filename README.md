@@ -108,6 +108,30 @@ La evidencia automatizada y las pruebas físicas pendientes están separadas en
 - Las cuentas suspendidas pierden acceso incluso si conservan un JWT anterior.
 - Cada usuario puede cambiar su contraseña desde Perfil.
 
+## Rutas viales, direcciones y vehículos
+
+- Las rutas se calculan sobre calles reales con OSRM y datos de OpenStreetMap.
+- El administrador puede agregar puntos de inicio, paso y fin desde el mapa o
+  buscando una dirección, y puede cambiar el orden de toda la secuencia.
+- Cada contenedor conserva coordenadas y una dirección legible obtenida por
+  geocodificación inversa.
+- Se guardan geometría, distancia, duración y ETA acumulado de cada parada.
+- Los vehículos son deliberadamente sencillos: solamente placa y estado
+  activo/inactivo.
+- El mapa completo también funciona en web mediante Leaflet/OpenStreetMap.
+- Durante el servicio se detecta cercanía a la siguiente parada y desvío de la
+  ruta, se puede abrir navegación externa y recalcular el tramo restante.
+- El recolector puede tomar una fotografía de incidencia, trabajar
+  temporalmente sin conexión y sincronizar acciones al recuperar la red.
+- El GPS en segundo plano está preparado para una compilación de desarrollo o
+  producción; Expo Go mantiene el rastreo únicamente en primer plano.
+- El ciudadano recibe avisos locales, ETA, distancia, placa, avance y ubicación
+  del recorrido.
+
+El backend usa el servicio público de OSRM por defecto. Para operar el motor
+vial completamente dentro de la LAN, consultar
+[docs/DESPLIEGUE_LAN.md](docs/DESPLIEGUE_LAN.md).
+
 La integración del módulo preparado por Víctor está documentada en
 [docs/INTEGRACION_VICTOR.md](docs/INTEGRACION_VICTOR.md).
 

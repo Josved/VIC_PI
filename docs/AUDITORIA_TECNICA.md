@@ -158,15 +158,21 @@ La tabla de identidad es `usuarios`:
 - `paradas_ejecucion_ruta`: resultado de cada contenedor del recorrido.
 - `ubicaciones_ejecucion_ruta`: historial GPS del recolector.
 - `incidencias_operativas`: problemas encontrados durante el servicio.
+- `detalles_contenedor`: dirección legible y componentes de calle.
+- `vehiculos`: placa y estado, sin información innecesaria.
+- `configuraciones_ruta_vial`: geometría, distancia, duración y proveedor.
+- `puntos_ruta`: secuencia de inicio, contenedores, pasos y fin con ETA.
+- `rutas_ejecucion_vial`: geometría y ETA restante después de recalcular.
 
-No existen todavía tablas para avisos, archivos o tokens de recuperación.
+No existen todavía tablas para tokens de recuperación. Los avisos operativos se
+derivan del estado de la ruta y las evidencias se almacenan en el volumen
+persistente.
 
 ## Limitaciones antes de considerarlo completo
 
-- Añadir almacenamiento real de archivos; por ahora la evidencia es una URL.
-- Implementar avisos desde el backend.
 - Implementar recuperación real de contraseña.
-- Añadir migraciones de esquema; actualmente se usa `create_all`.
+- Sustituir la migración compatible de tablas complementarias por Alembic antes
+  de una evolución grande del esquema.
 - Definir copias de seguridad del volumen SQLite.
 - Evaluar PostgreSQL si habrá varios procesos de escritura o crecimiento.
 - Realizar la etapa de seguridad antes de exponer el sistema fuera de la LAN.
@@ -180,5 +186,5 @@ No existen todavía tablas para avisos, archivos o tokens de recuperación.
 - Compilación web de Expo y servicio estático con Nginx.
 - Proxy `/api` para que el navegador y la API compartan origen.
 - Puerto directo de API para pruebas con Expo Go en la LAN.
-- Nueve pruebas automatizadas de QR ciudadano, administración, suspensión de
+- Diez pruebas automatizadas de QR ciudadano, administración, suspensión de
   cuentas, GPS, reportes, rutas, recorridos, incidencias y permisos por rol.

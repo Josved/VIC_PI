@@ -1,8 +1,12 @@
+import json
+from math import ceil
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .base_datos import obtener_base_datos
+from .enrutamiento import calcular_recorrido
 from .esquemas import (
     CancelarEjecucionEntrada,
     EjecucionRutaRespuesta,
@@ -10,19 +14,26 @@ from .esquemas import (
     IncidenciaOperacionRespuesta,
     ParadaEjecucionRespuesta,
     ParadaOperacionActualizar,
+    RecalcularRutaEntrada,
     UbicacionOperacionEntrada,
     UsuarioRutaRespuesta,
+    VehiculoRespuesta,
 )
 from .modelos import (
     AsignacionRuta,
+    ConfiguracionRutaVial,
     Contenedor,
+    DetalleContenedor,
     EjecucionRuta,
     IncidenciaOperativa,
     ParadaEjecucionRuta,
+    PuntoRuta,
+    RutaEjecucionVial,
     RutaContenedor,
     RutaRecoleccion,
     UbicacionEjecucionRuta,
     Usuario,
+    Vehiculo,
     ahora_utc,
 )
 from .permisos import requiere_rol
@@ -88,6 +99,32 @@ def crear_respuesta_ejecucion(
     total = len(filas_paradas)
     atendidas = sum(parada.estado != "pendiente" for parada, _ in filas_paradas)
     progreso = round((atendidas / total) * 100) if total else 0
+    configuracion_vial = base_datos.get(ConfiguracionRutaVial, ruta.id)
+    ruta_ejecucion = base_datos.get(RutaEjecucionVial, ejecucion.id)
+    vehiculo = (
+        base_datos.get(Vehiculo, configuracion_vial.vehiculo_id)
+        if configuracion_vial and configuracion_vial.vehiculo_id
+        else None
+    )
+    puntos_ruta = base_datos.scalars(
+        select(PuntoRuta).where(PuntoRuta.ruta_id == ruta.id),
+    ).all()
+    puntos_por_contenedor = {
+        punto.contenedor_id: punto for punto in puntos_ruta if punto.contenedor_id
+    }
+    geometria = []
+    geometria_json = (
+        ruta_ejecucion.geometria_json
+        if ruta_ejecucion and ruta_ejecucion.geometria_json
+        else configuracion_vial.geometria_json
+        if configuracion_vial
+        else None
+    )
+    if geometria_json:
+        try:
+            geometria = json.loads(geometria_json)
+        except json.JSONDecodeError:
+            geometria = []
 
     return EjecucionRutaRespuesta(
         id=ejecucion.id,
@@ -100,6 +137,7 @@ def crear_respuesta_ejecucion(
             apellidos=recolector.apellidos,
             correo=recolector.correo,
         ),
+        vehiculo=VehiculoRespuesta.model_validate(vehiculo) if vehiculo else None,
         fecha_servicio=ejecucion.fecha_servicio,
         estado=ejecucion.estado,
         motivo_cancelacion=ejecucion.motivo_cancelacion,
@@ -110,6 +148,15 @@ def crear_respuesta_ejecucion(
         ubicacion_actualizada_en=ejecucion.ubicacion_actualizada_en,
         iniciado_en=ejecucion.iniciado_en,
         finalizado_en=ejecucion.finalizado_en,
+        geometria=geometria,
+        distancia_restante_m=(
+            ruta_ejecucion.distancia_restante_m if ruta_ejecucion else None
+        ),
+        duracion_restante_minutos=(
+            ceil(ruta_ejecucion.duracion_restante_s / 60)
+            if ruta_ejecucion and ruta_ejecucion.duracion_restante_s is not None
+            else None
+        ),
         paradas=[
             ParadaEjecucionRespuesta(
                 id=parada.id,
@@ -120,6 +167,20 @@ def crear_respuesta_ejecucion(
                 observacion=parada.observacion,
                 latitud=contenedor.latitud,
                 longitud=contenedor.longitud,
+                direccion=(
+                    puntos_por_contenedor[contenedor.id].direccion
+                    if contenedor.id in puntos_por_contenedor
+                    else (
+                        base_datos.get(DetalleContenedor, contenedor.id).direccion_completa
+                        if base_datos.get(DetalleContenedor, contenedor.id)
+                        else None
+                    )
+                ),
+                eta_minutos=(
+                    puntos_por_contenedor[contenedor.id].eta_minutos
+                    if contenedor.id in puntos_por_contenedor
+                    else None
+                ),
                 atendido_en=parada.atendido_en,
             )
             for parada, contenedor in filas_paradas
@@ -168,6 +229,22 @@ def obtener_mi_recorrido_activo(
         .order_by(EjecucionRuta.id.desc()),
     )
     return crear_respuesta_ejecucion(base_datos, ejecucion) if ejecucion else None
+
+
+@enrutador.get("/historial", response_model=list[EjecucionRutaRespuesta])
+def listar_historial(
+    usuario: Usuario = Depends(requiere_rol("collector", "admin")),
+    base_datos: Session = Depends(obtener_base_datos),
+):
+    consulta = select(EjecucionRuta)
+    if usuario.rol != "admin":
+        consulta = consulta.where(EjecucionRuta.recolector_id == usuario.id)
+    consulta = consulta.order_by(EjecucionRuta.iniciado_en.desc()).limit(50)
+    ejecuciones = base_datos.scalars(consulta).all()
+    return [
+        crear_respuesta_ejecucion(base_datos, ejecucion)
+        for ejecucion in ejecuciones
+    ]
 
 
 @enrutador.get(
@@ -251,6 +328,17 @@ def iniciar_recorrido(
         ],
     )
     guardar_ubicacion(base_datos, ejecucion, recolector, ubicacion)
+    configuracion_vial = base_datos.get(ConfiguracionRutaVial, ruta.id)
+    if configuracion_vial:
+        base_datos.add(
+            RutaEjecucionVial(
+                ejecucion_id=ejecucion.id,
+                geometria_json=configuracion_vial.geometria_json,
+                distancia_restante_m=configuracion_vial.distancia_m,
+                duracion_restante_s=configuracion_vial.duracion_s,
+                recalculado_en=ahora_utc(),
+            ),
+        )
     base_datos.commit()
     base_datos.refresh(ejecucion)
     return crear_respuesta_ejecucion(base_datos, ejecucion)
@@ -274,6 +362,70 @@ def actualizar_ubicacion(
             detail="El recorrido ya no esta activo",
         )
     guardar_ubicacion(base_datos, ejecucion, recolector, datos)
+    base_datos.commit()
+    base_datos.refresh(ejecucion)
+    return crear_respuesta_ejecucion(base_datos, ejecucion)
+
+
+@enrutador.post(
+    "/ejecuciones/{ejecucion_id}/recalcular",
+    response_model=EjecucionRutaRespuesta,
+)
+def recalcular_recorrido(
+    ejecucion_id: int,
+    datos: RecalcularRutaEntrada,
+    recolector: Usuario = Depends(requiere_rol("collector")),
+    base_datos: Session = Depends(obtener_base_datos),
+):
+    ejecucion = obtener_ejecucion_o_error(base_datos, ejecucion_id)
+    validar_responsable(ejecucion, recolector)
+    if ejecucion.estado != "en_recorrido":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="El recorrido ya no esta activo",
+        )
+    filas = base_datos.execute(
+        select(ParadaEjecucionRuta, Contenedor)
+        .join(Contenedor, Contenedor.id == ParadaEjecucionRuta.contenedor_id)
+        .where(
+            ParadaEjecucionRuta.ejecucion_id == ejecucion.id,
+            ParadaEjecucionRuta.estado == "pendiente",
+        )
+        .order_by(ParadaEjecucionRuta.orden),
+    ).all()
+    puntos = [
+        {
+            "tipo": "inicio",
+            "latitud": datos.latitud,
+            "longitud": datos.longitud,
+        },
+        *[
+            {
+                "tipo": "contenedor",
+                "latitud": contenedor.latitud,
+                "longitud": contenedor.longitud,
+            }
+            for _, contenedor in filas
+        ],
+    ]
+    calculo = calcular_recorrido(puntos)
+    ruta_ejecucion = base_datos.get(RutaEjecucionVial, ejecucion.id)
+    if not ruta_ejecucion:
+        ruta_ejecucion = RutaEjecucionVial(ejecucion_id=ejecucion.id)
+        base_datos.add(ruta_ejecucion)
+    ruta_ejecucion.geometria_json = json.dumps(calculo["geometria"])
+    ruta_ejecucion.distancia_restante_m = calculo["distancia_m"]
+    ruta_ejecucion.duracion_restante_s = calculo["duracion_s"]
+    ruta_ejecucion.recalculado_en = ahora_utc()
+    guardar_ubicacion(
+        base_datos,
+        ejecucion,
+        recolector,
+        UbicacionOperacionEntrada(
+            latitud=datos.latitud,
+            longitud=datos.longitud,
+        ),
+    )
     base_datos.commit()
     base_datos.refresh(ejecucion)
     return crear_respuesta_ejecucion(base_datos, ejecucion)

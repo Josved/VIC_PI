@@ -12,9 +12,7 @@ module.exports = ({ config }) => ({
       ? {
           config: {
             ...config.android?.config,
-            googleMaps: {
-              apiKey: claveAndroid,
-            },
+            googleMaps: { apiKey: claveAndroid },
           },
         }
       : {}),
@@ -47,7 +45,12 @@ module.exports = ({ config }) => ({
       'expo-location',
       {
         locationWhenInUsePermission:
-          'VIC usa tu ubicación para registrar contenedores y mostrar los que están cerca.',
+          'VIC usa tu ubicación para registrar contenedores y mostrar recorridos.',
+        locationAlwaysAndWhenInUsePermission:
+          'VIC comparte la ubicación del recolector mientras exista un recorrido activo.',
+        isAndroidBackgroundLocationEnabled: true,
+        isAndroidForegroundServiceEnabled: true,
+        isIosBackgroundLocationEnabled: true,
       },
     ],
     [
@@ -59,11 +62,19 @@ module.exports = ({ config }) => ({
       },
     ],
     [
+      'expo-image-picker',
+      {
+        photosPermission:
+          'VIC usa tus fotografías como evidencia de una incidencia.',
+        cameraPermission:
+          'VIC usa la cámara para capturar evidencia de una incidencia.',
+      },
+    ],
+    ['expo-notifications', { color: '#2E7D32' }],
+    [
       'expo-build-properties',
       {
-        android: {
-          usesCleartextTraffic: permitirHttpLan,
-        },
+        android: { usesCleartextTraffic: permitirHttpLan },
       },
     ],
   ],

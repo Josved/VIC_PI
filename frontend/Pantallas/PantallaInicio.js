@@ -1,7 +1,9 @@
-import { useCallback, useState } from 'react';
+import * as Notifications from 'expo-notifications';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -49,11 +51,38 @@ const etiquetasOperacion = {
   cancelada: 'Ruta cancelada',
 };
 
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+    }),
+  });
+}
+
 export function PantallaInicio() {
   const [rutas, cambiarRutas] = useState([]);
   const [cargando, cambiarCargando] = useState(true);
   const [error, cambiarError] = useState('');
   const [diaSeleccionado, cambiarDiaSeleccionado] = useState(null);
+  const estadosAnteriores = useRef(null);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    Notifications.getPermissionsAsync()
+      .then((permiso) =>
+        permiso.granted ? permiso : Notifications.requestPermissionsAsync(),
+      )
+      .catch(() => null);
+    if (Platform.OS === 'android') {
+      Notifications.setNotificationChannelAsync('default', {
+        name: 'Avisos de recolección',
+        importance: Notifications.AndroidImportance.DEFAULT,
+      }).catch(() => null);
+    }
+  }, []);
 
   const cargarRutas = useCallback(async () => {
     try {
@@ -81,10 +110,38 @@ export function PantallaInicio() {
     }, [cargarRutas]),
   );
 
+  useEffect(() => {
+    const actuales = Object.fromEntries(
+      rutas.map((ruta) => [ruta.id, ruta.operacion?.estado || 'programada']),
+    );
+    if (estadosAnteriores.current) {
+      rutas.forEach((ruta) => {
+        const anterior = estadosAnteriores.current[ruta.id];
+        if (
+          anterior
+          && anterior !== 'en_recorrido'
+          && ruta.operacion?.estado === 'en_recorrido'
+        ) {
+          Notifications.scheduleNotificationAsync({
+            content: {
+              title: 'El recolector inició su recorrido',
+              body: `${ruta.nombre}: paso aproximado ${ruta.hora_aproximada}.`,
+            },
+            trigger: null,
+          }).catch(() => null);
+        }
+      });
+    }
+    estadosAnteriores.current = actuales;
+  }, [rutas]);
+
   const calendario = diasSemana.map((dia) => ({
     ...dia,
     rutas: rutas.filter((ruta) => ruta.dia_semana === dia.id),
   }));
+  const rutasEnCurso = rutas.filter(
+    (ruta) => ruta.operacion?.estado === 'en_recorrido',
+  );
 
   function abrirDetalle(dia) {
     cambiarDiaSeleccionado(dia);
@@ -98,6 +155,26 @@ export function PantallaInicio() {
           Consulta qué día pasará la recolección y su horario aproximado.
         </Text>
       </View>
+
+      {rutasEnCurso.map((ruta) => (
+        <Pressable
+          key={`aviso-${ruta.id}`}
+          onPress={() => {
+            const dia = calendario.find((item) => item.id === ruta.dia_semana);
+            if (dia) abrirDetalle(dia);
+          }}
+          style={estilos.avisoActivo}
+        >
+          <Route color={colores.white} size={23} />
+          <View style={estilos.flexible}>
+            <Text style={estilos.avisoActivoTitulo}>Recolector en recorrido</Text>
+            <Text style={estilos.avisoActivoTexto}>
+              {ruta.nombre} · {ruta.operacion.progreso_porcentaje}% · ETA siguiente{' '}
+              {ruta.operacion.eta_siguiente_minutos || 'calculando'} min
+            </Text>
+          </View>
+        </Pressable>
+      ))}
 
       <View style={estilos.seccion}>
         <View style={estilos.tituloCalendarioFila}>
@@ -238,9 +315,17 @@ export function PantallaInicio() {
                       {ruta.recolector ? (
                         <Text style={estilos.recolectorRuta}>
                           Responsable: {ruta.recolector.nombre}{' '}
-                          {ruta.recolector.apellidos}
+                          {ruta.recolector.apellidos} · Placa:{' '}
+                          {ruta.vehiculo?.placa || 'sin asignar'}
                         </Text>
                       ) : null}
+                      <Text style={estilos.contenedoresRuta}>
+                        Recorrido:{' '}
+                        {ruta.distancia_m == null
+                          ? 'pendiente'
+                          : `${(ruta.distancia_m / 1000).toFixed(1)} km`}{' '}
+                        · {ruta.duracion_minutos || 0} min estimados
+                      </Text>
                       {ruta.operacion ? (
                         <View style={estilos.estadoOperacion}>
                           <Text style={estilos.textoEstadoOperacion}>
@@ -251,6 +336,15 @@ export function PantallaInicio() {
                             {ruta.operacion.paradas_atendidas}/
                             {ruta.operacion.paradas_totales} paradas
                           </Text>
+                          {ruta.operacion.estado === 'en_recorrido' ? (
+                            <Text style={estilos.progresoOperacion}>
+                              Siguiente parada en aproximadamente{' '}
+                              {ruta.operacion.eta_siguiente_minutos || '—'} min ·{' '}
+                              {ruta.operacion.distancia_siguiente_m == null
+                                ? 'distancia calculándose'
+                                : `${Math.round(ruta.operacion.distancia_siguiente_m)} m`}
+                            </Text>
+                          ) : null}
                         </View>
                       ) : null}
                       {ruta.operacion?.estado === 'en_recorrido' ? (
@@ -259,6 +353,7 @@ export function PantallaInicio() {
                             ...contenedor,
                             estado: 'pendiente',
                           }))}
+                          geometria={ruta.geometria}
                           ubicacionRecolector={
                             ruta.operacion.latitud_actual != null
                               && ruta.operacion.longitud_actual != null
@@ -301,6 +396,7 @@ export function PantallaInicio() {
 }
 
 const estilos = StyleSheet.create({
+  flexible: { flex: 1 },
   encabezado: { marginBottom: espaciado.xl, marginTop: espaciado.sm },
   titulo: { color: colores.primary, fontSize: 26, fontWeight: '900' },
   subtitulo: {
@@ -309,6 +405,17 @@ const estilos = StyleSheet.create({
     fontSize: 15,
     lineHeight: 21,
   },
+  avisoActivo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: espaciado.md,
+    marginBottom: espaciado.lg,
+    padding: espaciado.md,
+    borderRadius: 15,
+    backgroundColor: '#2196F3',
+  },
+  avisoActivoTitulo: { color: colores.white, fontSize: 15, fontWeight: '900' },
+  avisoActivoTexto: { color: colores.white, fontSize: 12, lineHeight: 17 },
   seccion: { marginBottom: espaciado.xxl },
   tituloCalendarioFila: {
     flexDirection: 'row',

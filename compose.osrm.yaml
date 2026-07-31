@@ -1,0 +1,65 @@
+name: vic
+
+# Motor vial completamente local para el servidor LAN.
+# La primera preparacion descarga y procesa el mapa; puede tardar y ocupar varios GB.
+services:
+  osrm-descarga:
+    image: alpine:3.22
+    restart: "no"
+    environment:
+      OSRM_PBF_URL: ${OSRM_PBF_URL:-https://download.geofabrik.de/north-america/mexico-latest.osm.pbf}
+    volumes:
+      - vic_osrm_data:/data
+    command:
+      - /bin/sh
+      - -c
+      - >
+        test -f /data/mexico-latest.osm.pbf ||
+        wget -O /data/mexico-latest.osm.pbf "$${OSRM_PBF_URL}"
+
+  osrm-preparar:
+    image: ghcr.io/project-osrm/osrm-backend:latest
+    restart: "no"
+    depends_on:
+      osrm-descarga:
+        condition: service_completed_successfully
+    volumes:
+      - vic_osrm_data:/data
+    entrypoint:
+      - /bin/sh
+      - -c
+    command:
+      - >
+        test -f /data/mexico-latest.osrm.cells ||
+        (
+          osrm-extract -p /opt/car.lua /data/mexico-latest.osm.pbf &&
+          osrm-partition /data/mexico-latest.osrm &&
+          osrm-customize /data/mexico-latest.osrm
+        )
+
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:latest
+    restart: unless-stopped
+    depends_on:
+      osrm-preparar:
+        condition: service_completed_successfully
+    volumes:
+      - vic_osrm_data:/data:ro
+    command:
+      - osrm-routed
+      - --algorithm
+      - mld
+      - /data/mexico-latest.osrm
+    ports:
+      - "${VIC_OSRM_PORT:-15000}:5000"
+
+  backend:
+    environment:
+      VIC_ROUTING_URL: http://osrm:5000
+    depends_on:
+      osrm:
+        condition: service_started
+
+volumes:
+  vic_osrm_data:
+    name: vic_osrm_data

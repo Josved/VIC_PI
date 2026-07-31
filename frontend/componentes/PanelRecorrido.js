@@ -1,8 +1,12 @@
+import NetInfo from '@react-native-community/netinfo';
+import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import * as Notifications from 'expo-notifications';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
@@ -12,6 +16,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   CircleStop,
+  Camera,
+  History,
   LocateFixed,
   Navigation,
   Play,
@@ -20,9 +26,14 @@ import {
 
 import { Boton } from './Boton';
 import { CampoTexto } from './CampoTexto';
+import { ejecutarConRespaldo, sincronizarCola } from './colaOffline';
 import { conexionApi, obtenerMensajeErrorApi } from './conexionApi';
 import { usarSesion } from './ContextoSesion';
 import { MapaRuta } from './MapaRuta';
+import {
+  detenerRastreoSegundoPlano,
+  iniciarRastreoSegundoPlano,
+} from './rastreoSegundoPlano';
 import { colores, espaciado } from './tema';
 
 const tiposIncidencia = [
@@ -42,18 +53,37 @@ const etiquetasParada = {
   incidencia: 'Incidencia',
 };
 
+function distanciaMetros(origen, destino) {
+  const radio = 6371000;
+  const radianes = (valor) => (valor * Math.PI) / 180;
+  const diferenciaLatitud = radianes(destino.latitude - origen.latitude);
+  const diferenciaLongitud = radianes(destino.longitude - origen.longitude);
+  const latitud1 = radianes(origen.latitude);
+  const latitud2 = radianes(destino.latitude);
+  const valor =
+    Math.sin(diferenciaLatitud / 2) ** 2
+    + Math.cos(latitud1)
+      * Math.cos(latitud2)
+      * Math.sin(diferenciaLongitud / 2) ** 2;
+  return 2 * radio * Math.asin(Math.sqrt(valor));
+}
+
 export function PanelRecorrido({ rutas, alActualizarRutas }) {
   const { usuario } = usarSesion();
   const [ejecucion, cambiarEjecucion] = useState(null);
+  const [historial, cambiarHistorial] = useState([]);
   const [cargando, cambiarCargando] = useState(true);
   const [procesando, cambiarProcesando] = useState(false);
   const [error, cambiarError] = useState('');
   const [tipoIncidencia, cambiarTipoIncidencia] = useState('contenedor_bloqueado');
   const [comentarioIncidencia, cambiarComentarioIncidencia] = useState('');
   const [evidenciaIncidencia, cambiarEvidenciaIncidencia] = useState('');
+  const [evidenciaNombre, cambiarEvidenciaNombre] = useState('');
+  const [mensajeOffline, cambiarMensajeOffline] = useState('');
   const [paradaIncidenciaId, cambiarParadaIncidenciaId] = useState(null);
   const [motivoCancelacion, cambiarMotivoCancelacion] = useState('');
   const observador = useRef(null);
+  const llegadaNotificada = useRef(null);
 
   const rutasAsignadas = useMemo(
     () =>
@@ -62,13 +92,55 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
       ),
     [rutas, usuario?.id],
   );
+  const siguienteParada = useMemo(
+    () => ejecucion?.paradas.find((parada) => parada.estado === 'pendiente') || null,
+    [ejecucion?.paradas],
+  );
+  const ubicacionCalculada = useMemo(
+    () =>
+      ejecucion?.latitud_actual != null && ejecucion?.longitud_actual != null
+        ? {
+            latitude: ejecucion.latitud_actual,
+            longitude: ejecucion.longitud_actual,
+          }
+        : null,
+    [ejecucion?.latitud_actual, ejecucion?.longitud_actual],
+  );
+  const distanciaSiguiente = useMemo(
+    () =>
+      ubicacionCalculada && siguienteParada
+        ? distanciaMetros(ubicacionCalculada, {
+            latitude: siguienteParada.latitud,
+            longitude: siguienteParada.longitud,
+          })
+        : null,
+    [ubicacionCalculada, siguienteParada],
+  );
+  const distanciaRuta = useMemo(() => {
+    if (!ubicacionCalculada || !ejecucion?.geometria?.length) return null;
+    return Math.min(
+      ...ejecucion.geometria
+        .filter((_, indice) => indice % 5 === 0)
+        .map((punto) =>
+          distanciaMetros(ubicacionCalculada, {
+            latitude: punto.latitud,
+            longitude: punto.longitud,
+          }),
+        ),
+    );
+  }, [ubicacionCalculada, ejecucion?.geometria]);
+  const estaDesviado = distanciaRuta != null && distanciaRuta > 120;
 
   const cargarActivo = useCallback(async () => {
     try {
       cambiarCargando(true);
       cambiarError('');
-      const respuesta = await conexionApi.get('/operacion/mi-recorrido-activo');
+      const [respuesta, respuestaHistorial] = await Promise.all([
+        conexionApi.get('/operacion/mi-recorrido-activo'),
+        conexionApi.get('/operacion/historial'),
+      ]);
       cambiarEjecucion(respuesta.data);
+      cambiarHistorial(respuestaHistorial.data);
       if (respuesta.data) {
         const siguiente = respuesta.data.paradas.find(
           (parada) => parada.estado === 'pendiente',
@@ -89,6 +161,42 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
 
   useEffect(() => {
     cargarActivo();
+  }, [cargarActivo]);
+
+  useEffect(() => {
+    if (
+      !siguienteParada
+      || distanciaSiguiente == null
+      || distanciaSiguiente > 30
+      || llegadaNotificada.current === siguienteParada.id
+    ) {
+      return;
+    }
+    llegadaNotificada.current = siguienteParada.id;
+    Alert.alert(
+      'Llegaste a la parada',
+      `Estás a ${Math.round(distanciaSiguiente)} m de ${siguienteParada.codigo_qr}.`,
+    );
+    Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Llegaste a la siguiente parada',
+        body: siguienteParada.direccion || siguienteParada.codigo_qr,
+      },
+      trigger: null,
+    }).catch(() => null);
+  }, [distanciaSiguiente, siguienteParada?.id]);
+
+  useEffect(() => {
+    const cancelarSuscripcion = NetInfo.addEventListener(async (estado) => {
+      if (estado.isConnected) {
+        const resultado = await sincronizarCola();
+        if (resultado.enviadas > 0) {
+          cambiarMensajeOffline(`${resultado.enviadas} acciones sin conexión sincronizadas.`);
+          await cargarActivo();
+        }
+      }
+    });
+    return cancelarSuscripcion;
   }, [cargarActivo]);
 
   useEffect(() => {
@@ -113,7 +221,8 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
             return;
           }
           try {
-            const respuesta = await conexionApi.post(
+            const { respuesta, encolada } = await ejecutarConRespaldo(
+              'post',
               `/operacion/ejecuciones/${ejecucion.id}/ubicacion`,
               {
                 latitud: posicion.coords.latitude,
@@ -121,9 +230,10 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
                 precision_m: posicion.coords.accuracy ?? null,
               },
             );
-            if (montado) {
+            if (montado && respuesta) {
               cambiarEjecucion(respuesta.data);
             }
+            if (encolada) cambiarMensajeOffline('GPS guardado para sincronizar.');
           } catch {
             // El siguiente punto GPS vuelve a intentar sin interrumpir el recorrido.
           }
@@ -168,6 +278,7 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
       );
       cambiarEjecucion(respuesta.data);
       cambiarParadaIncidenciaId(respuesta.data.paradas[0]?.id || null);
+      iniciarRastreoSegundoPlano(respuesta.data.id).catch(() => false);
       await alActualizarRutas();
     } catch (excepcion) {
       cambiarError(
@@ -185,7 +296,8 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
     try {
       cambiarProcesando(true);
       cambiarError('');
-      const respuesta = await conexionApi.patch(
+      const { respuesta, encolada } = await ejecutarConRespaldo(
+        'patch',
         `/operacion/ejecuciones/${ejecucion.id}/paradas/${parada.id}`,
         {
           estado,
@@ -195,12 +307,25 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
               : null,
         },
       );
-      cambiarEjecucion(respuesta.data);
-      const siguiente = respuesta.data.paradas.find(
+      const datosActualizados = respuesta?.data || {
+        ...ejecucion,
+        paradas: ejecucion.paradas.map((item) =>
+          item.id === parada.id ? { ...item, estado } : item,
+        ),
+      };
+      const atendidas = datosActualizados.paradas.filter(
+        (item) => item.estado !== 'pendiente',
+      ).length;
+      datosActualizados.progreso_porcentaje = Math.round(
+        (atendidas / datosActualizados.paradas.length) * 100,
+      );
+      cambiarEjecucion(datosActualizados);
+      const siguiente = datosActualizados.paradas.find(
         (item) => item.estado === 'pendiente',
       );
       cambiarParadaIncidenciaId(siguiente?.id || null);
-      await alActualizarRutas();
+      if (encolada) cambiarMensajeOffline('Parada guardada para sincronizar.');
+      else await alActualizarRutas();
     } catch (excepcion) {
       Alert.alert(
         'No se pudo actualizar',
@@ -225,7 +350,8 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
       } catch {
         ubicacion = null;
       }
-      const respuesta = await conexionApi.post(
+      const { respuesta, encolada } = await ejecutarConRespaldo(
+        'post',
         `/operacion/ejecuciones/${ejecucion.id}/incidencias`,
         {
           parada_id: paradaIncidenciaId,
@@ -236,14 +362,16 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
           longitud: ubicacion?.longitude ?? null,
         },
       );
-      cambiarEjecucion(respuesta.data);
+      if (respuesta) cambiarEjecucion(respuesta.data);
+      if (encolada) cambiarMensajeOffline('Incidencia guardada para sincronizar.');
       cambiarComentarioIncidencia('');
       cambiarEvidenciaIncidencia('');
-      const siguiente = respuesta.data.paradas.find(
+      cambiarEvidenciaNombre('');
+      const siguiente = (respuesta?.data || ejecucion).paradas.find(
         (parada) => parada.estado === 'pendiente',
       );
       cambiarParadaIncidenciaId(siguiente?.id || null);
-      await alActualizarRutas();
+      if (!encolada) await alActualizarRutas();
     } catch (excepcion) {
       cambiarError(
         obtenerMensajeErrorApi(excepcion, 'No se pudo registrar la incidencia.'),
@@ -260,6 +388,7 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
       await conexionApi.post(
         `/operacion/ejecuciones/${ejecucion.id}/finalizar`,
       );
+      await detenerRastreoSegundoPlano();
       cambiarEjecucion(null);
       await alActualizarRutas();
       Alert.alert('Recorrido finalizado', 'Todas las paradas quedaron registradas.');
@@ -287,12 +416,75 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
         `/operacion/ejecuciones/${ejecucion.id}/cancelar`,
         { motivo: motivoCancelacion.trim() },
       );
+      await detenerRastreoSegundoPlano();
       cambiarEjecucion(null);
       cambiarMotivoCancelacion('');
       await alActualizarRutas();
     } catch (excepcion) {
       cambiarError(
         obtenerMensajeErrorApi(excepcion, 'No se pudo cancelar el recorrido.'),
+      );
+    } finally {
+      cambiarProcesando(false);
+    }
+  }
+
+  async function tomarEvidencia() {
+    try {
+      const permiso = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permiso.granted) {
+        cambiarError('Autoriza la cámara para adjuntar una fotografía.');
+        return;
+      }
+      const resultado = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.75,
+      });
+      if (resultado.canceled) return;
+      cambiarProcesando(true);
+      const recurso = resultado.assets[0];
+      const formulario = new FormData();
+      formulario.append(
+        'archivo',
+        recurso.file || {
+          uri: recurso.uri,
+          name: recurso.fileName || `evidencia-${Date.now()}.jpg`,
+          type: recurso.mimeType || 'image/jpeg',
+        },
+      );
+      const respuesta = await conexionApi.post('/archivos/evidencias', formulario, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      cambiarEvidenciaIncidencia(respuesta.data.url);
+      cambiarEvidenciaNombre(recurso.fileName || 'Fotografía capturada');
+    } catch (excepcion) {
+      cambiarError(
+        obtenerMensajeErrorApi(excepcion, 'No fue posible subir la fotografía.'),
+      );
+    } finally {
+      cambiarProcesando(false);
+    }
+  }
+
+  function abrirNavegacion(parada) {
+    Linking.openURL(
+      `https://www.google.com/maps/dir/?api=1&destination=${parada.latitud},${parada.longitud}&travelmode=driving`,
+    );
+  }
+
+  async function recalcularRecorrido() {
+    try {
+      cambiarProcesando(true);
+      const ubicacion = await obtenerUbicacion();
+      const respuesta = await conexionApi.post(
+        `/operacion/ejecuciones/${ejecucion.id}/recalcular`,
+        { latitud: ubicacion.latitude, longitud: ubicacion.longitude },
+      );
+      cambiarEjecucion(respuesta.data);
+      cambiarError('');
+    } catch (excepcion) {
+      cambiarError(
+        obtenerMensajeErrorApi(excepcion, 'No fue posible recalcular el recorrido.'),
       );
     } finally {
       cambiarProcesando(false);
@@ -317,6 +509,7 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
         <Text style={estilos.ayuda}>
           El GPS comenzará a compartirse únicamente cuando inicies un recorrido.
         </Text>
+        {mensajeOffline ? <Text style={estilos.sincronizacion}>{mensajeOffline}</Text> : null}
         {error ? <Text style={estilos.error}>{error}</Text> : null}
         {rutasAsignadas.length === 0 ? (
           <Text style={estilos.vacio}>No tienes rutas activas asignadas.</Text>
@@ -328,7 +521,8 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
                   <Text style={estilos.nombreRuta}>{ruta.nombre}</Text>
                   <Text style={estilos.detalleRuta}>
                     {ruta.zona} · {ruta.hora_aproximada} ·{' '}
-                    {ruta.contenedores.length} paradas
+                    {ruta.contenedores.length} paradas · placa{' '}
+                    {ruta.vehiculo?.placa || 'sin asignar'}
                   </Text>
                 </View>
                 <Pressable
@@ -344,6 +538,22 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
             ))}
           </View>
         )}
+        {historial.length > 0 ? (
+          <View style={estilos.historial}>
+            <View style={estilos.tituloFila}>
+              <History color={colores.primary} size={19} />
+              <Text style={estilos.subtitulo}>Historial reciente</Text>
+            </View>
+            {historial.slice(0, 5).map((registro) => (
+              <View key={registro.id} style={estilos.historialFila}>
+                <Text style={estilos.codigo}>{registro.ruta_nombre}</Text>
+                <Text style={estilos.estadoParada}>
+                  {registro.fecha_servicio} · {registro.estado} · {registro.progreso_porcentaje}%
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
       </View>
     );
   }
@@ -380,14 +590,46 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
 
       <MapaRuta
         paradas={ejecucion.paradas}
+        geometria={ejecucion.geometria}
         ubicacionRecolector={ubicacionRecolector}
       />
       <View style={estilos.gps}>
         <LocateFixed color="#2196F3" size={19} />
         <Text style={estilos.textoGps}>
-          GPS activo · actualización automática cada 15 segundos o 20 metros
+          GPS activo · primer plano cada 15 segundos; segundo plano en la aplicación instalada
         </Text>
       </View>
+      {mensajeOffline ? <Text style={estilos.sincronizacion}>{mensajeOffline}</Text> : null}
+      {siguienteParada ? (
+        <View style={estilos.siguiente}>
+          <View style={estilos.flexible}>
+            <Text style={estilos.codigo}>Siguiente: {siguienteParada.codigo_qr}</Text>
+            <Text style={estilos.estadoParada}>
+              {distanciaSiguiente == null
+                ? 'Calculando distancia'
+                : `${Math.round(distanciaSiguiente)} m · ETA aproximado ${Math.max(1, Math.ceil(distanciaSiguiente / 417))} min`}
+            </Text>
+          </View>
+          <Pressable onPress={() => abrirNavegacion(siguienteParada)} style={estilos.botonNavegar}>
+            <Navigation color={colores.white} size={18} />
+            <Text style={estilos.textoIniciar}>Navegar</Text>
+          </Pressable>
+        </View>
+      ) : null}
+      {estaDesviado ? (
+        <View style={estilos.desvio}>
+          <AlertTriangle color="#8A5800" size={20} />
+          <View style={estilos.flexible}>
+            <Text style={estilos.codigo}>Te alejaste del recorrido</Text>
+            <Text style={estilos.estadoParada}>
+              Estás aproximadamente a {Math.round(distanciaRuta)} m de la línea calculada.
+            </Text>
+          </View>
+          <Pressable onPress={recalcularRecorrido} style={estilos.botonRecalcular}>
+            <Text style={estilos.textoRecalcular}>Recalcular</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <Text style={estilos.subtitulo}>Paradas del recorrido</Text>
       <View style={estilos.lista}>
@@ -407,9 +649,20 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
               <Text style={estilos.estadoParada}>
                 {etiquetasParada[parada.estado]}
               </Text>
+              <Text numberOfLines={2} style={estilos.direccion}>
+                {parada.direccion || 'Dirección no disponible'}
+                {parada.eta_minutos != null ? ` · ETA inicial ${parada.eta_minutos} min` : ''}
+              </Text>
             </View>
             {parada.estado === 'pendiente' ? (
               <View style={estilos.accionesParada}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => abrirNavegacion(parada)}
+                  style={estilos.accionAzul}
+                >
+                  <Navigation color={colores.white} size={18} />
+                </Pressable>
                 <Pressable
                   accessibilityRole="button"
                   disabled={procesando}
@@ -480,12 +733,12 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
           value={comentarioIncidencia}
           onChangeText={cambiarComentarioIncidencia}
         />
-        <CampoTexto
-          etiqueta="Enlace de evidencia (opcional)"
-          autoCapitalize="none"
-          value={evidenciaIncidencia}
-          onChangeText={cambiarEvidenciaIncidencia}
-        />
+        <Pressable onPress={tomarEvidencia} style={estilos.foto}>
+          <Camera color={colores.secondary} size={20} />
+          <Text style={estilos.textoFoto}>
+            {evidenciaNombre || 'Tomar fotografía de evidencia'}
+          </Text>
+        </Pressable>
         <Boton
           texto="Guardar incidencia"
           variante="secundario"
@@ -590,6 +843,48 @@ const estilos = StyleSheet.create({
     backgroundColor: '#E8F3FC',
   },
   textoGps: { flex: 1, color: '#1769AA', fontSize: 11, fontWeight: '800' },
+  sincronizacion: {
+    padding: espaciado.sm,
+    color: '#1769AA',
+    fontSize: 12,
+    fontWeight: '800',
+    borderRadius: 10,
+    backgroundColor: '#E8F3FC',
+  },
+  siguiente: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: espaciado.sm,
+    padding: espaciado.md,
+    borderWidth: 1,
+    borderColor: '#2196F3',
+    borderRadius: 14,
+    backgroundColor: '#E8F3FC',
+  },
+  botonNavegar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: espaciado.md,
+    paddingVertical: 10,
+    borderRadius: 11,
+    backgroundColor: '#2196F3',
+  },
+  desvio: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: espaciado.sm,
+    padding: espaciado.md,
+    borderRadius: 14,
+    backgroundColor: '#FFF3CD',
+  },
+  botonRecalcular: {
+    paddingHorizontal: espaciado.sm,
+    paddingVertical: 8,
+    borderRadius: 9,
+    backgroundColor: '#8A5800',
+  },
+  textoRecalcular: { color: colores.white, fontSize: 11, fontWeight: '900' },
   parada: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -612,7 +907,9 @@ const estilos = StyleSheet.create({
   textoNumero: { color: colores.white, fontWeight: '900' },
   codigo: { color: colores.text, fontSize: 13, fontWeight: '900' },
   estadoParada: { color: colores.muted, fontSize: 11 },
+  direccion: { color: colores.muted, fontSize: 10, lineHeight: 14 },
   accionesParada: { flexDirection: 'row', gap: 6 },
+  accionAzul: { padding: 9, borderRadius: 10, backgroundColor: '#2196F3' },
   accionVerde: { padding: 9, borderRadius: 10, backgroundColor: colores.primary },
   accionNaranja: { padding: 9, borderRadius: 10, backgroundColor: colores.secondary },
   incidencia: {
@@ -636,6 +933,29 @@ const estilos = StyleSheet.create({
   },
   chipActivo: { borderColor: colores.secondary, backgroundColor: '#FFE5CC' },
   textoChip: { color: colores.text, fontSize: 11, fontWeight: '800' },
+  foto: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: espaciado.sm,
+    padding: espaciado.md,
+    borderWidth: 1,
+    borderColor: colores.secondary,
+    borderRadius: 12,
+    backgroundColor: colores.white,
+  },
+  textoFoto: { color: colores.secondary, fontSize: 13, fontWeight: '900' },
+  historial: {
+    gap: espaciado.sm,
+    marginTop: espaciado.md,
+    paddingTop: espaciado.md,
+    borderTopWidth: 1,
+    borderTopColor: colores.border,
+  },
+  historialFila: {
+    padding: espaciado.sm,
+    borderRadius: 10,
+    backgroundColor: colores.white,
+  },
   error: {
     padding: espaciado.md,
     color: colores.danger,

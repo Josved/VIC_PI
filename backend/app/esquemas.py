@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 RolUsuario = Literal["citizen", "collector", "admin"]
 MotivoReporte = Literal["lleno", "danado", "sucio", "ubicacion_incorrecta", "otro"]
@@ -78,6 +78,12 @@ class RegistroContenedorQREntrada(BaseModel):
     latitud: float = Field(ge=-90, le=90)
     longitud: float = Field(ge=-180, le=180)
     precision_m: float | None = Field(default=None, ge=0, le=10000)
+    direccion_completa: str | None = Field(default=None, max_length=300)
+    calle: str | None = Field(default=None, max_length=160)
+    numero: str | None = Field(default=None, max_length=30)
+    colonia: str | None = Field(default=None, max_length=140)
+    codigo_postal: str | None = Field(default=None, max_length=20)
+    municipio: str | None = Field(default=None, max_length=140)
 
     @field_validator("codigo_qr")
     @classmethod
@@ -95,6 +101,12 @@ class ContenedorRespuesta(BaseModel):
     longitud: float
     precision_m: float | None
     distancia_m: float | None = None
+    direccion_completa: str | None = None
+    calle: str | None = None
+    numero: str | None = None
+    colonia: str | None = None
+    codigo_postal: str | None = None
+    municipio: str | None = None
     veces_registrado: int
     creado_por_id: int
     actualizado_por_id: int
@@ -177,6 +189,72 @@ class UsuarioRutaRespuesta(BaseModel):
     correo: EmailStr
 
 
+class VehiculoCrear(BaseModel):
+    placa: str = Field(min_length=3, max_length=20, pattern=r"^[A-Za-z0-9 -]+$")
+
+    @field_validator("placa")
+    @classmethod
+    def normalizar_placa(cls, valor: str) -> str:
+        return " ".join(valor.upper().strip().split())
+
+
+class VehiculoActualizar(BaseModel):
+    placa: str | None = Field(
+        default=None,
+        min_length=3,
+        max_length=20,
+        pattern=r"^[A-Za-z0-9 -]+$",
+    )
+    activo: bool | None = None
+
+    @field_validator("placa")
+    @classmethod
+    def normalizar_placa(cls, valor: str | None) -> str | None:
+        return " ".join(valor.upper().strip().split()) if valor else valor
+
+
+class VehiculoRespuesta(BaseModel):
+    id: int
+    placa: str
+    activo: bool
+    creado_en: datetime
+    actualizado_en: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PuntoRutaEntrada(BaseModel):
+    tipo: Literal["inicio", "contenedor", "paso", "fin"]
+    contenedor_id: int | None = Field(default=None, gt=0)
+    latitud: float = Field(ge=-90, le=90)
+    longitud: float = Field(ge=-180, le=180)
+    direccion: str | None = Field(default=None, max_length=300)
+
+    @model_validator(mode="after")
+    def validar_tipo(self):
+        if self.tipo == "contenedor" and self.contenedor_id is None:
+            raise ValueError("Un punto contenedor requiere contenedor_id")
+        if self.tipo != "contenedor" and self.contenedor_id is not None:
+            raise ValueError("Solo un punto contenedor puede tener contenedor_id")
+        return self
+
+
+class PuntoRutaRespuesta(BaseModel):
+    id: int
+    tipo: Literal["inicio", "contenedor", "paso", "fin"]
+    orden: int
+    contenedor_id: int | None
+    latitud: float
+    longitud: float
+    direccion: str | None
+    eta_minutos: int | None
+
+
+class CoordenadaRutaRespuesta(BaseModel):
+    latitud: float
+    longitud: float
+
+
 class RutaCrear(BaseModel):
     nombre: str = Field(min_length=2, max_length=100)
     zona: str = Field(min_length=2, max_length=120)
@@ -185,6 +263,13 @@ class RutaCrear(BaseModel):
     descripcion: str | None = Field(default=None, max_length=500)
     contenedor_ids: list[int] = Field(min_length=1, max_length=200)
     recolector_id: int | None = Field(default=None, gt=0)
+    vehiculo_id: int | None = Field(default=None, gt=0)
+    puntos_ruta: list[PuntoRutaEntrada] | None = Field(
+        default=None,
+        min_length=1,
+        max_length=250,
+    )
+    optimizar_orden: bool = False
 
     @field_validator("nombre", "zona")
     @classmethod
@@ -222,6 +307,13 @@ class RutaActualizar(BaseModel):
     descripcion: str | None = Field(default=None, max_length=500)
     contenedor_ids: list[int] | None = Field(default=None, min_length=1, max_length=200)
     recolector_id: int | None = Field(default=None, gt=0)
+    vehiculo_id: int | None = Field(default=None, gt=0)
+    puntos_ruta: list[PuntoRutaEntrada] | None = Field(
+        default=None,
+        min_length=1,
+        max_length=250,
+    )
+    optimizar_orden: bool | None = None
     activa: bool | None = None
 
     @field_validator("nombre", "zona")
@@ -252,6 +344,8 @@ class ContenedorRutaRespuesta(BaseModel):
     orden: int
     latitud: float
     longitud: float
+    direccion: str | None = None
+    eta_minutos: int | None = None
 
 
 class OperacionRutaResumenRespuesta(BaseModel):
@@ -266,6 +360,8 @@ class OperacionRutaResumenRespuesta(BaseModel):
     ubicacion_actualizada_en: datetime | None
     iniciado_en: datetime
     finalizado_en: datetime | None
+    eta_siguiente_minutos: int | None = None
+    distancia_siguiente_m: float | None = None
 
 
 class RutaRespuesta(BaseModel):
@@ -278,8 +374,16 @@ class RutaRespuesta(BaseModel):
     activa: bool
     creado_por_id: int
     recolector: UsuarioRutaRespuesta | None
+    vehiculo: VehiculoRespuesta | None = None
     operacion: OperacionRutaResumenRespuesta | None
     contenedores: list[ContenedorRutaRespuesta]
+    puntos_ruta: list[PuntoRutaRespuesta] = Field(default_factory=list)
+    geometria: list[CoordenadaRutaRespuesta] = Field(default_factory=list)
+    distancia_m: float | None = None
+    duracion_minutos: int | None = None
+    proveedor_ruta: str = "sin_calcular"
+    estado_calculo_ruta: str = "pendiente"
+    detalle_calculo_ruta: str | None = None
     creado_en: datetime
     actualizado_en: datetime
 
@@ -317,6 +421,8 @@ class ParadaEjecucionRespuesta(BaseModel):
     observacion: str | None
     latitud: float
     longitud: float
+    direccion: str | None = None
+    eta_minutos: int | None = None
     atendido_en: datetime | None
 
 
@@ -339,6 +445,7 @@ class EjecucionRutaRespuesta(BaseModel):
     ruta_nombre: str
     zona: str
     recolector: UsuarioRutaRespuesta
+    vehiculo: VehiculoRespuesta | None = None
     fecha_servicio: str
     estado: EstadoEjecucion
     motivo_cancelacion: str | None
@@ -349,5 +456,28 @@ class EjecucionRutaRespuesta(BaseModel):
     ubicacion_actualizada_en: datetime | None
     iniciado_en: datetime
     finalizado_en: datetime | None
+    geometria: list[CoordenadaRutaRespuesta] = Field(default_factory=list)
+    distancia_restante_m: float | None = None
+    duracion_restante_minutos: int | None = None
     paradas: list[ParadaEjecucionRespuesta]
     incidencias: list[IncidenciaOperacionRespuesta]
+
+
+class BusquedaDireccionRespuesta(BaseModel):
+    direccion_completa: str
+    latitud: float
+    longitud: float
+    calle: str | None = None
+    numero: str | None = None
+    colonia: str | None = None
+    codigo_postal: str | None = None
+    municipio: str | None = None
+
+
+class RecalcularRutaEntrada(BaseModel):
+    latitud: float = Field(ge=-90, le=90)
+    longitud: float = Field(ge=-180, le=180)
+
+
+class EvidenciaRespuesta(BaseModel):
+    url: str
