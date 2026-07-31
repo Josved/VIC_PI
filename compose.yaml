@@ -1,0 +1,45 @@
+name: vic
+
+services:
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      VIC_APP_NAME: ${VIC_APP_NAME:-VIC API}
+      VIC_DATABASE_URL: sqlite:////data/vic.db
+      VIC_JWT_SECRET: ${VIC_JWT_SECRET:-change-this-secret-before-production}
+      VIC_JWT_ALGORITHM: ${VIC_JWT_ALGORITHM:-HS256}
+      VIC_TOKEN_EXPIRATION_MINUTES: ${VIC_TOKEN_EXPIRATION_MINUTES:-1440}
+      VIC_CORS_ORIGINS: ${VIC_CORS_ORIGINS:-*}
+      VIC_ROOT_PATH: /api
+    volumes:
+      - vic_data:/data
+    ports:
+      - "${VIC_API_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/salud', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        EXPO_PUBLIC_API_URL: /api
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${VIC_WEB_PORT:-8080}:80"
+
+volumes:
+  vic_data:
+    name: vic_data

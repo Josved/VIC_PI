@@ -1,0 +1,11 @@
+node_modules
+.expo
+.expo-check
+.expo-temp
+dist
+web-build
+.env
+.env.*
+npm-debug.log
+.git
+.gitignore

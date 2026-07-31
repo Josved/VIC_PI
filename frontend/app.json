@@ -1,15 +1,17 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "VIC",
+    "slug": "vic",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
+      "bundleIdentifier": "com.josved.vic",
       "supportsTablet": true
     },
     "android": {
+      "package": "com.josved.vic",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",

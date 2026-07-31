@@ -1,0 +1,23 @@
+{
+  "cli": {
+    "version": ">= 19.1.0"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "environment": "preview",
+      "env": {
+        "VIC_ALLOW_INSECURE_HTTP": "true"
+      }
+    },
+    "production": {
+      "environment": "production",
+      "env": {
+        "VIC_ALLOW_INSECURE_HTTP": "false"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
