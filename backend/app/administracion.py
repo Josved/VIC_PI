@@ -47,6 +47,7 @@ def crear_respuesta(
         rol=usuario.rol,
         activo=control.activo,
         requiere_cambio_contrasena=control.requiere_cambio_contrasena,
+        correo_verificado=control.correo_verificado,
         creado_en=usuario.creado_en,
         actualizado_en=usuario.actualizado_en,
     )
@@ -125,6 +126,7 @@ def crear_usuario(
             usuario_id=usuario.id,
             activo=True,
             requiere_cambio_contrasena=True,
+            correo_verificado=True,
             actualizado_por_id=administrador.id,
         ),
     )

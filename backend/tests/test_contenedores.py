@@ -19,32 +19,55 @@ from app.principal import aplicacion
 
 class PruebasContenedores(unittest.TestCase):
     @classmethod
+    def registrar_y_verificar(cls, nombre, correo):
+        with patch("app.autenticacion.enviar_codigo_verificacion") as enviar_codigo:
+            registro = cls.cliente.post(
+                "/autenticacion/registro",
+                json={
+                    "nombre": nombre,
+                    "apellidos": "Pruebas",
+                    "correo": correo,
+                    "contrasena": "Prueba123!",
+                },
+            )
+        assert registro.status_code == 201, registro.text
+        assert registro.json()["requiere_verificacion"] is True
+        assert "token_acceso" not in registro.json()
+        enviar_codigo.assert_called_once()
+        codigo = enviar_codigo.call_args.args[2]
+
+        acceso_prematuro = cls.cliente.post(
+            "/autenticacion/iniciar-sesion",
+            json={"correo": correo, "contrasena": "Prueba123!"},
+        )
+        assert acceso_prematuro.status_code == 403, acceso_prematuro.text
+
+        with patch("app.autenticacion.enviar_bienvenida") as enviar_bienvenida:
+            verificacion = cls.cliente.post(
+                "/autenticacion/verificar-correo",
+                json={"correo": correo, "codigo": codigo},
+            )
+        assert verificacion.status_code == 200, verificacion.text
+        enviar_bienvenida.assert_called_once()
+        reutilizacion = cls.cliente.post(
+            "/autenticacion/verificar-correo",
+            json={"correo": correo, "codigo": codigo},
+        )
+        assert reutilizacion.status_code == 400, reutilizacion.text
+        return verificacion
+
+    @classmethod
     def setUpClass(cls):
         cls.cliente = TestClient(aplicacion)
-        respuesta = cls.cliente.post(
-            "/autenticacion/registro",
-            json={
-                "nombre": "Usuario",
-                "apellidos": "Pruebas",
-                "correo": "mapas@example.com",
-                "contrasena": "Prueba123!",
-            },
-        )
-        assert respuesta.status_code == 201, respuesta.text
+        respuesta = cls.registrar_y_verificar("Usuario", "mapas@example.com")
         cls.encabezados_ciudadano = {
             "Authorization": f"Bearer {respuesta.json()['token_acceso']}",
         }
 
-        respuesta_recolector = cls.cliente.post(
-            "/autenticacion/registro",
-            json={
-                "nombre": "Recolector",
-                "apellidos": "Pruebas",
-                "correo": "recolector@example.com",
-                "contrasena": "Prueba123!",
-            },
+        respuesta_recolector = cls.registrar_y_verificar(
+            "Recolector",
+            "recolector@example.com",
         )
-        assert respuesta_recolector.status_code == 201, respuesta_recolector.text
         with SesionLocal() as base_datos:
             recolector = (
                 base_datos.query(Usuario)
@@ -59,16 +82,7 @@ class PruebasContenedores(unittest.TestCase):
             "Authorization": f"Bearer {respuesta_recolector.json()['token_acceso']}",
         }
 
-        respuesta_admin = cls.cliente.post(
-            "/autenticacion/registro",
-            json={
-                "nombre": "Admin",
-                "apellidos": "Pruebas",
-                "correo": "admin@example.com",
-                "contrasena": "Prueba123!",
-            },
-        )
-        assert respuesta_admin.status_code == 201, respuesta_admin.text
+        respuesta_admin = cls.registrar_y_verificar("Admin", "admin@example.com")
         with SesionLocal() as base_datos:
             administrador = (
                 base_datos.query(Usuario)
@@ -187,6 +201,19 @@ class PruebasContenedores(unittest.TestCase):
             },
         )
         self.assertEqual(respuesta.status_code, 422, respuesta.text)
+
+    def test_registro_legitimo_no_es_bloqueado_por_reenvio_anonimo(self):
+        correo = "antibloqueo@example.com"
+        with patch("app.autenticacion.enviar_codigo_verificacion") as envio_anonimo:
+            reenvio = self.cliente.post(
+                "/autenticacion/reenviar-verificacion",
+                json={"correo": correo},
+            )
+        self.assertEqual(reenvio.status_code, 200, reenvio.text)
+        envio_anonimo.assert_not_called()
+
+        verificacion = self.registrar_y_verificar("Antibloqueo", correo)
+        self.assertIn("token_acceso", verificacion.json())
 
     def test_zz_recuperacion_contrasena_es_real_segura_y_revoca_sesion(self):
         with patch("app.autenticacion.enviar_codigo_recuperacion") as enviar_codigo:

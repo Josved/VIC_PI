@@ -52,6 +52,7 @@ export function PantallaInicioSesion({ navigation }) {
         {errorFormulario ? <Text style={estilos.errorFormulario}>{errorFormulario}</Text> : null}
         <Boton texto="Iniciar sesión" alPresionar={entrar} cargando={cargando} />
         <Boton texto="Recuperar contraseña" variante="fantasma" alPresionar={() => navigation.navigate('RecuperarContrasena')} />
+        <Boton texto="Verificar mi correo" variante="fantasma" alPresionar={() => navigation.navigate('VerificarCorreo', { correo })} />
         <Boton texto="Crear cuenta" variante="secundario" alPresionar={() => navigation.navigate('Registro')} />
       </View>
     </PantallaBase>

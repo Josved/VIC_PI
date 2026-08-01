@@ -38,6 +38,7 @@ class UsuarioRespuesta(BaseModel):
     rol: RolUsuario
     activo: bool = True
     requiere_cambio_contrasena: bool = False
+    correo_verificado: bool = True
     creado_en: datetime
     actualizado_en: datetime
 
@@ -66,6 +67,24 @@ class RestablecerContrasenaEntrada(BaseModel):
     correo: EmailStr
     codigo: str = Field(min_length=8, max_length=8, pattern=r"^[A-Za-z0-9]{8}$")
     contrasena_nueva: str = Field(min_length=8, max_length=72)
+
+    model_config = {"extra": "forbid"}
+
+
+class RegistroPendienteRespuesta(BaseModel):
+    mensaje: str
+    requiere_verificacion: bool = True
+
+
+class VerificarCorreoEntrada(BaseModel):
+    correo: EmailStr
+    codigo: str = Field(min_length=8, max_length=8, pattern=r"^[A-Za-z0-9]{8}$")
+
+    model_config = {"extra": "forbid"}
+
+
+class ReenviarVerificacionEntrada(BaseModel):
+    correo: EmailStr
 
     model_config = {"extra": "forbid"}
 
@@ -182,6 +201,7 @@ class UsuarioAdministradoRespuesta(BaseModel):
     rol: RolUsuario
     activo: bool
     requiere_cambio_contrasena: bool
+    correo_verificado: bool
     creado_en: datetime
     actualizado_en: datetime
 

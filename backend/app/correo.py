@@ -80,3 +80,25 @@ def enviar_aviso_contrasena_actualizada(destinatario: str, nombre: str) -> bool:
         "Si tú no hiciste este cambio, contacta de inmediato al administrador del sistema."
     )
     return enviar_correo(destinatario, "Tu contraseña de VIC fue actualizada", texto)
+
+
+def enviar_codigo_verificacion(destinatario: str, nombre: str, codigo: str) -> bool:
+    minutos = configuracion.minutos_expiracion_verificacion
+    texto = (
+        f"Hola, {nombre}.\n\n"
+        "Gracias por crear tu cuenta en VIC.\n\n"
+        f"Tu código para verificar el correo es: {codigo}\n\n"
+        f"El código vence en {minutos} minutos y solo puede usarse una vez. "
+        "Si tú no creaste esta cuenta, ignora este mensaje.\n\n"
+        "VIC nunca te pedirá que compartas este código ni tu contraseña."
+    )
+    return enviar_correo(destinatario, "Verifica tu correo para entrar a VIC", texto)
+
+
+def enviar_bienvenida(destinatario: str, nombre: str) -> bool:
+    texto = (
+        f"Hola, {nombre}.\n\n"
+        "Tu correo fue verificado correctamente y tu cuenta de VIC ya está activa.\n\n"
+        "Ya puedes iniciar sesión y utilizar las funciones disponibles para ciudadanos."
+    )
+    return enviar_correo(destinatario, "Tu cuenta de VIC está verificada", texto)

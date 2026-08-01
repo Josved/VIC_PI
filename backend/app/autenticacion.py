@@ -7,17 +7,31 @@ from sqlalchemy.orm import Session
 
 from .base_datos import obtener_base_datos
 from .configuracion import configuracion
-from .correo import enviar_aviso_contrasena_actualizada, enviar_codigo_recuperacion
+from .correo import (
+    enviar_aviso_contrasena_actualizada,
+    enviar_bienvenida,
+    enviar_codigo_recuperacion,
+    enviar_codigo_verificacion,
+)
 from .esquemas import (
     CambiarContrasenaEntrada,
     InicioSesionEntrada,
+    ReenviarVerificacionEntrada,
     RecuperarContrasenaEntrada,
     RegistroEntrada,
+    RegistroPendienteRespuesta,
     RestablecerContrasenaEntrada,
     SesionRespuesta,
     UsuarioRespuesta,
+    VerificarCorreoEntrada,
 )
-from .modelos import ControlUsuario, RecuperacionContrasena, Usuario, ahora_utc
+from .modelos import (
+    ControlUsuario,
+    RecuperacionContrasena,
+    Usuario,
+    VerificacionCorreo,
+    ahora_utc,
+)
 from .seguridad import (
     cifrar_contrasena,
     comparar_hash_secreto,
@@ -32,6 +46,9 @@ enrutador = APIRouter(prefix="/autenticacion", tags=["autenticacion"])
 seguridad_bearer = HTTPBearer()
 MENSAJE_RECUPERACION = (
     "Si el correo está registrado, recibirás un código para recuperar tu contraseña."
+)
+MENSAJE_VERIFICACION = (
+    "Si la cuenta está pendiente, recibirás un código para verificar el correo."
 )
 
 
@@ -56,6 +73,7 @@ def crear_usuario_respuesta(
         requiere_cambio_contrasena=(
             control.requiere_cambio_contrasena if control else False
         ),
+        correo_verificado=control.correo_verificado if control else True,
         creado_en=usuario.creado_en,
         actualizado_en=usuario.actualizado_en,
     )
@@ -94,6 +112,11 @@ def obtener_usuario_actual(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="La cuenta está suspendida. Contacta al administrador",
         )
+    if control and not control.correo_verificado:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Debes verificar tu correo antes de continuar",
+        )
     if control and control.version_sesion != version_sesion:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -103,8 +126,73 @@ def obtener_usuario_actual(
     return usuario
 
 
-@enrutador.post("/registro", response_model=SesionRespuesta, status_code=status.HTTP_201_CREATED)
-def registrar_usuario(datos: RegistroEntrada, base_datos: Session = Depends(obtener_base_datos)):
+def crear_solicitud_verificacion(
+    base_datos: Session,
+    correo: str,
+    usuario: Usuario | None,
+    omitir_limite: bool = False,
+) -> str | None:
+    ahora = ahora_utc()
+    destino_hash = crear_hash_secreto(correo)
+    base_datos.execute(
+        delete(VerificacionCorreo).where(
+            VerificacionCorreo.creado_en < ahora - timedelta(days=7),
+        ),
+    )
+    solicitudes_recientes = base_datos.scalar(
+        select(func.count(VerificacionCorreo.id)).where(
+            VerificacionCorreo.destino_hash == destino_hash,
+            VerificacionCorreo.creado_en >= ahora - timedelta(hours=1),
+        ),
+    ) or 0
+    ultima_solicitud = base_datos.scalar(
+        select(VerificacionCorreo)
+        .where(VerificacionCorreo.destino_hash == destino_hash)
+        .order_by(VerificacionCorreo.creado_en.desc()),
+    )
+    en_enfriamiento = bool(
+        ultima_solicitud
+        and ultima_solicitud.creado_en
+        > ahora - timedelta(seconds=configuracion.segundos_entre_correos_verificacion)
+    )
+    if not omitir_limite and (
+        solicitudes_recientes >= configuracion.max_solicitudes_verificacion_hora
+        or en_enfriamiento
+    ):
+        return None
+
+    codigo = crear_codigo_recuperacion()
+    if usuario:
+        base_datos.execute(
+            update(VerificacionCorreo)
+            .where(
+                VerificacionCorreo.usuario_id == usuario.id,
+                VerificacionCorreo.usado_en.is_(None),
+            )
+            .values(usado_en=ahora),
+        )
+    base_datos.add(
+        VerificacionCorreo(
+            usuario_id=usuario.id if usuario else None,
+            destino_hash=destino_hash,
+            codigo_hash=crear_hash_secreto(codigo) if usuario else None,
+            expira_en=ahora
+            + timedelta(minutes=configuracion.minutos_expiracion_verificacion),
+        ),
+    )
+    return codigo if usuario else None
+
+
+@enrutador.post(
+    "/registro",
+    response_model=RegistroPendienteRespuesta,
+    status_code=status.HTTP_201_CREATED,
+)
+def registrar_usuario(
+    datos: RegistroEntrada,
+    tareas: BackgroundTasks,
+    base_datos: Session = Depends(obtener_base_datos),
+):
     correo = datos.correo.lower()
     usuario_existente = base_datos.scalar(select(Usuario).where(Usuario.correo == correo))
     if usuario_existente:
@@ -124,10 +212,103 @@ def registrar_usuario(datos: RegistroEntrada, base_datos: Session = Depends(obte
             usuario_id=usuario.id,
             activo=True,
             requiere_cambio_contrasena=False,
+            correo_verificado=False,
         ),
     )
+    codigo = crear_solicitud_verificacion(
+        base_datos,
+        correo,
+        usuario,
+        omitir_limite=True,
+    )
     base_datos.commit()
-    base_datos.refresh(usuario)
+    if codigo:
+        tareas.add_task(
+            enviar_codigo_verificacion,
+            usuario.correo,
+            usuario.nombre,
+            codigo,
+        )
+    return RegistroPendienteRespuesta(
+        mensaje="Cuenta creada. Revisa tu correo para verificarla",
+    )
+
+
+@enrutador.post("/reenviar-verificacion")
+def reenviar_verificacion(
+    datos: ReenviarVerificacionEntrada,
+    tareas: BackgroundTasks,
+    base_datos: Session = Depends(obtener_base_datos),
+):
+    correo = datos.correo.lower()
+    usuario = base_datos.scalar(select(Usuario).where(Usuario.correo == correo))
+    control = obtener_control_usuario(base_datos, usuario.id) if usuario else None
+    usuario_pendiente = usuario if control and not control.correo_verificado else None
+    codigo = crear_solicitud_verificacion(base_datos, correo, usuario_pendiente)
+    base_datos.commit()
+    if codigo and usuario_pendiente:
+        tareas.add_task(
+            enviar_codigo_verificacion,
+            usuario_pendiente.correo,
+            usuario_pendiente.nombre,
+            codigo,
+        )
+    return {"mensaje": MENSAJE_VERIFICACION}
+
+
+@enrutador.post("/verificar-correo", response_model=SesionRespuesta)
+def verificar_correo(
+    datos: VerificarCorreoEntrada,
+    tareas: BackgroundTasks,
+    base_datos: Session = Depends(obtener_base_datos),
+):
+    ahora = ahora_utc()
+    correo = datos.correo.lower()
+    usuario = base_datos.scalar(select(Usuario).where(Usuario.correo == correo))
+    control = obtener_control_usuario(base_datos, usuario.id) if usuario else None
+    verificacion = None
+    if usuario and control and not control.correo_verificado:
+        verificacion = base_datos.scalar(
+            select(VerificacionCorreo)
+            .where(
+                VerificacionCorreo.usuario_id == usuario.id,
+                VerificacionCorreo.destino_hash == crear_hash_secreto(correo),
+                VerificacionCorreo.usado_en.is_(None),
+                VerificacionCorreo.expira_en > ahora,
+            )
+            .order_by(VerificacionCorreo.creado_en.desc()),
+        )
+
+    codigo_valido = bool(
+        verificacion
+        and verificacion.codigo_hash
+        and verificacion.intentos_fallidos
+        < configuracion.max_intentos_codigo_verificacion
+        and comparar_hash_secreto(datos.codigo, verificacion.codigo_hash)
+    )
+    if not codigo_valido:
+        if verificacion:
+            verificacion.intentos_fallidos += 1
+            if verificacion.intentos_fallidos >= configuracion.max_intentos_codigo_verificacion:
+                verificacion.usado_en = ahora
+            base_datos.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El código no es válido o ya venció. Solicita uno nuevo",
+        )
+
+    control.correo_verificado = True
+    control.actualizado_en = ahora
+    base_datos.execute(
+        update(VerificacionCorreo)
+        .where(
+            VerificacionCorreo.usuario_id == usuario.id,
+            VerificacionCorreo.usado_en.is_(None),
+        )
+        .values(usado_en=ahora),
+    )
+    base_datos.commit()
+    tareas.add_task(enviar_bienvenida, usuario.correo, usuario.nombre)
     return crear_sesion(usuario, base_datos)
 
 
@@ -142,6 +323,11 @@ def iniciar_sesion(datos: InicioSesionEntrada, base_datos: Session = Depends(obt
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="La cuenta está suspendida. Contacta al administrador",
+        )
+    if control and not control.correo_verificado:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Debes verificar tu correo antes de iniciar sesión",
         )
 
     return crear_sesion(usuario, base_datos)

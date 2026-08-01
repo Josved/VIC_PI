@@ -57,7 +57,16 @@ export function ProveedorSesion({ children }) {
 
   async function registrarCuenta(datos) {
     const respuesta = await conexionApi.post('/autenticacion/registro', datos);
+    return respuesta.data;
+  }
+
+  async function verificarCorreo(datos) {
+    const respuesta = await conexionApi.post('/autenticacion/verificar-correo', datos);
     await guardarSesion(respuesta.data);
+  }
+
+  async function reenviarVerificacion(correo) {
+    await conexionApi.post('/autenticacion/reenviar-verificacion', { correo });
   }
 
   async function pedirRecuperacionContrasena(correo) {
@@ -92,6 +101,8 @@ export function ProveedorSesion({ children }) {
       cargando,
       iniciarSesion,
       registrarCuenta,
+      verificarCorreo,
+      reenviarVerificacion,
       pedirRecuperacionContrasena,
       restablecerContrasena,
       refrescarUsuario,

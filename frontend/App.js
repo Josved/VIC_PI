@@ -15,6 +15,7 @@ import { PantallaInicioSesion } from './Pantallas/PantallaInicioSesion';
 import { PantallaCarga } from './Pantallas/Pantalla_Carga';
 import { PantallaPerfil } from './Pantallas/PantallaPerfil';
 import { PantallaRegistro } from './Pantallas/PantallaRegistro';
+import { PantallaVerificarCorreo } from './Pantallas/PantallaVerificarCorreo';
 import { PantallaReportes } from './Pantallas/PantallaReportes';
 import { PantallaRutas } from './Pantallas/PantallaRutas';
 
@@ -26,6 +27,7 @@ function NavegadorSesion() {
     <PilaSesion.Navigator screenOptions={{ headerShown: false }}>
       <PilaSesion.Screen name="InicioSesion" component={PantallaInicioSesion} />
       <PilaSesion.Screen name="Registro" component={PantallaRegistro} />
+      <PilaSesion.Screen name="VerificarCorreo" component={PantallaVerificarCorreo} />
       <PilaSesion.Screen name="RecuperarContrasena" component={PantallaRecuperarContrasena} />
     </PilaSesion.Navigator>
   );

@@ -10,6 +10,12 @@ VIC envía un código aleatorio de ocho caracteres al correo registrado. El cód
 
 La API responde de la misma forma aunque el correo no esté registrado y limita cada destino a tres solicitudes por hora, con un minuto entre correos. Al cambiar la contraseña se invalidan las sesiones anteriores.
 
+## Verificación al crear una cuenta
+
+Las cuentas ciudadanas nuevas quedan pendientes hasta demostrar que tienen acceso al correo registrado. VIC envía un código de ocho caracteres que vence después de 15 minutos, es de un solo uso y se bloquea después de cinco intentos fallidos. También se limita el reenvío a tres solicitudes por hora.
+
+Los usuarios existentes se migran como verificados para no bloquear cuentas que ya estaban en uso. Las cuentas de recolector y administrador continúan siendo creadas exclusivamente por un administrador.
+
 ## Configurar Gmail por SMTP
 
 No guardes credenciales reales en Git. Copia estas variables en el archivo local `.env` de la raíz:

@@ -56,6 +56,9 @@ export function PantallaRegistro({ navigation }) {
         correo: formulario.correo,
         contrasena: formulario.contrasena,
       });
+      navigation.replace('VerificarCorreo', {
+        correo: formulario.correo.trim().toLowerCase(),
+      });
     } catch (error) {
       setErrorFormulario(obtenerMensajeErrorApi(error, 'No se pudo crear la cuenta.'));
     } finally {

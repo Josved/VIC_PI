@@ -28,3 +28,10 @@ def migrar_esquema(engine: Engine) -> None:
                         "ADD COLUMN version_sesion INTEGER NOT NULL DEFAULT 1"
                     ),
                 )
+            if "correo_verificado" not in columnas_control:
+                conexion.execute(
+                    text(
+                        "ALTER TABLE control_usuarios "
+                        "ADD COLUMN correo_verificado BOOLEAN NOT NULL DEFAULT 1"
+                    ),
+                )

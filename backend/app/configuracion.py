@@ -41,6 +41,26 @@ class Configuracion(BaseModel):
         ge=1,
         le=20,
     )
+    minutos_expiracion_verificacion: int = Field(
+        default_factory=lambda: int(os.getenv("VIC_EMAIL_VERIFICATION_EXPIRATION_MINUTES", "15")),
+        ge=5,
+        le=60,
+    )
+    max_solicitudes_verificacion_hora: int = Field(
+        default_factory=lambda: int(os.getenv("VIC_EMAIL_VERIFICATION_MAX_REQUESTS_PER_HOUR", "3")),
+        ge=1,
+        le=20,
+    )
+    segundos_entre_correos_verificacion: int = Field(
+        default_factory=lambda: int(os.getenv("VIC_EMAIL_VERIFICATION_COOLDOWN_SECONDS", "60")),
+        ge=10,
+        le=3600,
+    )
+    max_intentos_codigo_verificacion: int = Field(
+        default_factory=lambda: int(os.getenv("VIC_EMAIL_VERIFICATION_MAX_CODE_ATTEMPTS", "5")),
+        ge=1,
+        le=20,
+    )
     smtp_host: str = Field(default_factory=lambda: os.getenv("VIC_SMTP_HOST", ""))
     smtp_port: int = Field(
         default_factory=lambda: int(os.getenv("VIC_SMTP_PORT", "587")),
