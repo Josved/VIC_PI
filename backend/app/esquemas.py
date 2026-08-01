@@ -116,6 +116,54 @@ class ContenedorRespuesta(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ContenedorActualizar(BaseModel):
+    latitud: float | None = Field(default=None, ge=-90, le=90)
+    longitud: float | None = Field(default=None, ge=-180, le=180)
+    precision_m: float | None = Field(default=None, ge=0, le=10000)
+    direccion_completa: str | None = Field(default=None, max_length=300)
+    calle: str | None = Field(default=None, max_length=160)
+    numero: str | None = Field(default=None, max_length=30)
+    colonia: str | None = Field(default=None, max_length=140)
+    codigo_postal: str | None = Field(default=None, max_length=20)
+    municipio: str | None = Field(default=None, max_length=140)
+
+    @model_validator(mode="after")
+    def validar_al_menos_un_campo(self):
+        if all(value is None for value in self.model_dump().values()):
+            raise ValueError("Al menos un campo debe actualizarse")
+        return self
+
+
+class RegistroUbicacionContenedorRespuesta(BaseModel):
+    id: int
+    contenedor_id: int
+    usuario_id: int
+    latitud: float
+    longitud: float
+    precision_m: float | None
+    registrado_en: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class RegistroUbicacionContenedorActualizar(BaseModel):
+    latitud: float | None = Field(default=None, ge=-90, le=90)
+    longitud: float | None = Field(default=None, ge=-180, le=180)
+    precision_m: float | None = Field(default=None, ge=0, le=10000)
+
+    @model_validator(mode="after")
+    def validar_al_menos_un_campo(self):
+        if all(value is None for value in self.model_dump().values()):
+            raise ValueError("Al menos un campo debe actualizarse")
+        return self
+
+
+class RegistroUbicacionContenedorCrear(BaseModel):
+    latitud: float = Field(ge=-90, le=90)
+    longitud: float = Field(ge=-180, le=180)
+    precision_m: float | None = Field(default=None, ge=0, le=10000)
+
+
 class RegistroContenedorQRRespuesta(BaseModel):
     accion: Literal["creado", "actualizado"]
     contenedor: ContenedorRespuesta

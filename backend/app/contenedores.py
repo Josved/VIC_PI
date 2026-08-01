@@ -7,9 +7,13 @@ from sqlalchemy.orm import Session
 from .autenticacion import obtener_usuario_actual
 from .base_datos import obtener_base_datos
 from .esquemas import (
+    ContenedorActualizar,
     ContenedorRespuesta,
     RegistroContenedorQREntrada,
     RegistroContenedorQRRespuesta,
+    RegistroUbicacionContenedorActualizar,
+    RegistroUbicacionContenedorCrear,
+    RegistroUbicacionContenedorRespuesta,
 )
 from .modelos import (
     Contenedor,
@@ -18,6 +22,7 @@ from .modelos import (
     Usuario,
     ahora_utc,
 )
+from .permisos import requiere_rol
 
 enrutador = APIRouter(prefix="/contenedores", tags=["contenedores"])
 RADIO_TIERRA_M = 6_371_000
@@ -176,6 +181,185 @@ def obtener_contenedor(
             detail="Contenedor no encontrado",
         )
     return crear_respuesta(base_datos, contenedor)
+
+
+@enrutador.get(
+    "/{contenedor_id}/registros",
+    response_model=list[RegistroUbicacionContenedorRespuesta],
+)
+def listar_registros_contenedor(
+    contenedor_id: int,
+    _usuario_actual: Usuario = Depends(requiere_rol("collector", "admin")),
+    base_datos: Session = Depends(obtener_base_datos),
+):
+    contenedor = base_datos.get(Contenedor, contenedor_id)
+    if not contenedor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contenedor no encontrado",
+        )
+
+    registros = base_datos.scalars(
+        select(RegistroUbicacionContenedor)
+        .where(RegistroUbicacionContenedor.contenedor_id == contenedor_id)
+        .order_by(RegistroUbicacionContenedor.registrado_en.desc()),
+    ).all()
+    return registros
+
+
+@enrutador.post(
+    "/{contenedor_id}/registros",
+    response_model=RegistroUbicacionContenedorRespuesta,
+    status_code=status.HTTP_201_CREATED,
+)
+def crear_registro_contenedor(
+    contenedor_id: int,
+    datos: RegistroUbicacionContenedorCrear,
+    _administrador: Usuario = Depends(requiere_rol("admin")),
+    base_datos: Session = Depends(obtener_base_datos),
+):
+    contenedor = base_datos.get(Contenedor, contenedor_id)
+    if not contenedor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contenedor no encontrado",
+        )
+
+    registro = RegistroUbicacionContenedor(
+        contenedor_id=contenedor.id,
+        usuario_id=_administrador.id,
+        latitud=datos.latitud,
+        longitud=datos.longitud,
+        precision_m=datos.precision_m,
+    )
+    base_datos.add(registro)
+    base_datos.commit()
+    base_datos.refresh(registro)
+    return registro
+
+
+@enrutador.patch(
+    "/{contenedor_id}/registros/{registro_id}",
+    response_model=RegistroUbicacionContenedorRespuesta,
+)
+def actualizar_registro_contenedor(
+    contenedor_id: int,
+    registro_id: int,
+    datos: RegistroUbicacionContenedorActualizar,
+    _administrador: Usuario = Depends(requiere_rol("admin")),
+    base_datos: Session = Depends(obtener_base_datos),
+):
+    contenedor = base_datos.get(Contenedor, contenedor_id)
+    if not contenedor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contenedor no encontrado",
+        )
+
+    registro = base_datos.get(RegistroUbicacionContenedor, registro_id)
+    if not registro or registro.contenedor_id != contenedor_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Registro no encontrado",
+        )
+
+    cambios = datos.model_dump(exclude_unset=True)
+    for campo, valor in cambios.items():
+        setattr(registro, campo, valor)
+    base_datos.commit()
+    base_datos.refresh(registro)
+    return registro
+
+
+@enrutador.delete("/{contenedor_id}/registros/{registro_id}")
+def eliminar_registro_contenedor(
+    contenedor_id: int,
+    registro_id: int,
+    _administrador: Usuario = Depends(requiere_rol("admin")),
+    base_datos: Session = Depends(obtener_base_datos),
+):
+    contenedor = base_datos.get(Contenedor, contenedor_id)
+    if not contenedor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contenedor no encontrado",
+        )
+
+    registro = base_datos.get(RegistroUbicacionContenedor, registro_id)
+    if not registro or registro.contenedor_id != contenedor_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Registro no encontrado",
+        )
+
+    base_datos.delete(registro)
+    base_datos.commit()
+    return {"mensaje": "Registro eliminado"}
+
+
+@enrutador.patch("/{contenedor_id}", response_model=ContenedorRespuesta)
+def actualizar_contenedor(
+    contenedor_id: int,
+    datos: ContenedorActualizar,
+    _administrador: Usuario = Depends(requiere_rol("admin")),
+    base_datos: Session = Depends(obtener_base_datos),
+):
+    contenedor = base_datos.get(Contenedor, contenedor_id)
+    if not contenedor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contenedor no encontrado",
+        )
+
+    cambios = datos.model_dump(exclude_unset=True)
+    if "latitud" in cambios:
+        contenedor.latitud = cambios["latitud"]
+    if "longitud" in cambios:
+        contenedor.longitud = cambios["longitud"]
+    if "precision_m" in cambios:
+        contenedor.precision_m = cambios["precision_m"]
+    if cambios:
+        contenedor.actualizado_en = ahora_utc()
+        contenedor.actualizado_por_id = _administrador.id
+
+    campos_direccion = {
+        "direccion_completa": cambios.get("direccion_completa"),
+        "calle": cambios.get("calle"),
+        "numero": cambios.get("numero"),
+        "colonia": cambios.get("colonia"),
+        "codigo_postal": cambios.get("codigo_postal"),
+        "municipio": cambios.get("municipio"),
+    }
+    if any(value is not None for value in campos_direccion.values()):
+        detalle = base_datos.get(DetalleContenedor, contenedor.id)
+        if not detalle:
+            detalle = DetalleContenedor(contenedor_id=contenedor.id)
+            base_datos.add(detalle)
+        for campo, valor in campos_direccion.items():
+            if valor is not None:
+                setattr(detalle, campo, valor.strip() or None)
+        detalle.actualizado_en = ahora_utc()
+
+    base_datos.commit()
+    base_datos.refresh(contenedor)
+    return crear_respuesta(base_datos, contenedor)
+
+
+@enrutador.delete("/{contenedor_id}")
+def eliminar_contenedor(
+    contenedor_id: int,
+    _administrador: Usuario = Depends(requiere_rol("admin")),
+    base_datos: Session = Depends(obtener_base_datos),
+):
+    contenedor = base_datos.get(Contenedor, contenedor_id)
+    if not contenedor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contenedor no encontrado",
+        )
+    base_datos.delete(contenedor)
+    base_datos.commit()
+    return {"mensaje": "Contenedor eliminado"}
 
 
 @enrutador.get("", response_model=list[ContenedorRespuesta])
