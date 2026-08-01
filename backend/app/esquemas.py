@@ -48,7 +48,7 @@ class RegistroEntrada(BaseModel):
     nombre: str = Field(min_length=2, max_length=50, pattern=PATRON_NOMBRE)
     apellidos: str = Field(min_length=2, max_length=50, pattern=PATRON_NOMBRE)
     correo: EmailStr
-    contrasena: str = Field(min_length=6, max_length=72)
+    contrasena: str = Field(min_length=8, max_length=72)
 
     model_config = {"extra": "forbid"}
 
@@ -63,8 +63,11 @@ class RecuperarContrasenaEntrada(BaseModel):
 
 
 class RestablecerContrasenaEntrada(BaseModel):
-    token: str
-    contrasena: str = Field(min_length=6, max_length=72)
+    correo: EmailStr
+    codigo: str = Field(min_length=8, max_length=8, pattern=r"^[A-Za-z0-9]{8}$")
+    contrasena_nueva: str = Field(min_length=8, max_length=72)
+
+    model_config = {"extra": "forbid"}
 
 
 class SesionRespuesta(BaseModel):

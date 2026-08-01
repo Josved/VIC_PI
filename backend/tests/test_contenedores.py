@@ -13,7 +13,7 @@ os.environ["VIC_EVIDENCE_DIR"] = str(Path(directorio_temporal.name) / "evidencia
 from starlette.testclient import TestClient
 
 from app.base_datos import SesionLocal, motor_base_datos
-from app.modelos import RegistroUbicacionContenedor, Usuario
+from app.modelos import RecuperacionContrasena, RegistroUbicacionContenedor, Usuario
 from app.principal import aplicacion
 
 
@@ -187,6 +187,86 @@ class PruebasContenedores(unittest.TestCase):
             },
         )
         self.assertEqual(respuesta.status_code, 422, respuesta.text)
+
+    def test_zz_recuperacion_contrasena_es_real_segura_y_revoca_sesion(self):
+        with patch("app.autenticacion.enviar_codigo_recuperacion") as enviar_codigo:
+            solicitud = self.cliente.post(
+                "/autenticacion/recuperar-contrasena",
+                json={"correo": "mapas@example.com"},
+            )
+        self.assertEqual(solicitud.status_code, 200, solicitud.text)
+        enviar_codigo.assert_called_once()
+        codigo = enviar_codigo.call_args.args[2]
+        self.assertEqual(len(codigo), 8)
+
+        with SesionLocal() as base_datos:
+            usuario_recuperado = (
+                base_datos.query(Usuario).filter_by(correo="mapas@example.com").one()
+            )
+            recuperacion = (
+                base_datos.query(RecuperacionContrasena)
+                .filter_by(usuario_id=usuario_recuperado.id)
+                .order_by(RecuperacionContrasena.id.desc())
+                .first()
+            )
+            self.assertIsNotNone(recuperacion)
+            self.assertNotEqual(recuperacion.codigo_hash, codigo)
+
+        codigo_incorrecto = self.cliente.post(
+            "/autenticacion/restablecer-contrasena",
+            json={
+                "correo": "mapas@example.com",
+                "codigo": "AAAAAAAA",
+                "contrasena_nueva": "NuevaPrueba123!",
+            },
+        )
+        self.assertEqual(codigo_incorrecto.status_code, 400, codigo_incorrecto.text)
+
+        with patch("app.autenticacion.enviar_aviso_contrasena_actualizada") as enviar_aviso:
+            cambio = self.cliente.post(
+                "/autenticacion/restablecer-contrasena",
+                json={
+                    "correo": "mapas@example.com",
+                    "codigo": codigo,
+                    "contrasena_nueva": "NuevaPrueba123!",
+                },
+            )
+        self.assertEqual(cambio.status_code, 200, cambio.text)
+        enviar_aviso.assert_called_once()
+
+        sesion_anterior = self.cliente.get(
+            "/autenticacion/mi-usuario",
+            headers=self.encabezados_ciudadano,
+        )
+        self.assertEqual(sesion_anterior.status_code, 401, sesion_anterior.text)
+
+        inicio_nuevo = self.cliente.post(
+            "/autenticacion/iniciar-sesion",
+            json={
+                "correo": "mapas@example.com",
+                "contrasena": "NuevaPrueba123!",
+            },
+        )
+        self.assertEqual(inicio_nuevo.status_code, 200, inicio_nuevo.text)
+
+        reutilizacion = self.cliente.post(
+            "/autenticacion/restablecer-contrasena",
+            json={
+                "correo": "mapas@example.com",
+                "codigo": codigo,
+                "contrasena_nueva": "OtraPrueba123!",
+            },
+        )
+        self.assertEqual(reutilizacion.status_code, 400, reutilizacion.text)
+
+        with patch("app.autenticacion.enviar_codigo_recuperacion") as enviar_inexistente:
+            inexistente = self.cliente.post(
+                "/autenticacion/recuperar-contrasena",
+                json={"correo": "no-existe@example.com"},
+            )
+        self.assertEqual(inexistente.status_code, 200, inexistente.text)
+        self.assertEqual(inexistente.json(), solicitud.json())
+        enviar_inexistente.assert_not_called()
 
     def test_ciudadano_puede_registrar_y_actualizar_ubicacion(self):
         creacion = self.cliente.post(

@@ -34,9 +34,9 @@ aplicacion = FastAPI(
 aplicacion.add_middleware(
     CORSMiddleware,
     allow_origins=configuracion.origenes_cors,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials="*" not in configuracion.origenes_cors,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 Path(configuracion.directorio_evidencias).mkdir(parents=True, exist_ok=True)

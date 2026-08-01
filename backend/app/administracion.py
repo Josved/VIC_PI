@@ -195,6 +195,7 @@ def restablecer_contrasena(
     usuario.actualizado_en = ahora_utc()
     control = obtener_control(base_datos, usuario)
     control.requiere_cambio_contrasena = True
+    control.version_sesion += 1
     control.actualizado_por_id = administrador.id
     control.actualizado_en = ahora_utc()
     base_datos.commit()
