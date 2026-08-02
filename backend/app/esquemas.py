@@ -151,7 +151,7 @@ class ContenedorActualizar(BaseModel):
 
     @model_validator(mode="after")
     def validar_al_menos_un_campo(self):
-        if all(value is None for value in self.model_dump().values()):
+        if not self.model_fields_set:
             raise ValueError("Al menos un campo debe actualizarse")
         return self
 
@@ -175,7 +175,7 @@ class RegistroUbicacionContenedorActualizar(BaseModel):
 
     @model_validator(mode="after")
     def validar_al_menos_un_campo(self):
-        if all(value is None for value in self.model_dump().values()):
+        if not self.model_fields_set:
             raise ValueError("Al menos un campo debe actualizarse")
         return self
 

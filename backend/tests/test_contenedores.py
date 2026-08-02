@@ -299,6 +299,22 @@ class PruebasContenedores(unittest.TestCase):
         self.assertEqual(registros_final.status_code, 200, registros_final.text)
         self.assertEqual(len(registros_final.json()), 2)
 
+        direccion = self.cliente.patch(
+            f"/contenedores/{id_contenedor}",
+            headers=self.encabezados_admin,
+            json={"direccion_completa": "Calle de Prueba 123"},
+        )
+        self.assertEqual(direccion.status_code, 200, direccion.text)
+        self.assertEqual(direccion.json()["direccion_completa"], "Calle de Prueba 123")
+
+        direccion_eliminada = self.cliente.patch(
+            f"/contenedores/{id_contenedor}",
+            headers=self.encabezados_admin,
+            json={"direccion_completa": None},
+        )
+        self.assertEqual(direccion_eliminada.status_code, 200, direccion_eliminada.text)
+        self.assertIsNone(direccion_eliminada.json()["direccion_completa"])
+
     def test_coordenadas_invalidas_son_rechazadas(self):
         respuesta = self.cliente.post(
             "/contenedores/registrar-qr",
@@ -548,6 +564,18 @@ class PruebasContenedores(unittest.TestCase):
             reporte_actualizado["respuesta"],
             "El contenedor fue atendido y ya está disponible.",
         )
+
+        eliminacion_ciudadano = self.cliente.delete(
+            f"/contenedores/{contenedor_id}",
+            headers=self.encabezados_ciudadano,
+        )
+        self.assertEqual(eliminacion_ciudadano.status_code, 403)
+
+        eliminacion_relacionado = self.cliente.delete(
+            f"/contenedores/{contenedor_id}",
+            headers=self.encabezados_admin,
+        )
+        self.assertEqual(eliminacion_relacionado.status_code, 409, eliminacion_relacionado.text)
 
     def test_rutas_semanales_y_permisos(self):
         contenedor = self.cliente.post(
