@@ -91,6 +91,7 @@ class PruebasContenedores(unittest.TestCase):
             )
             administrador.rol = "admin"
             base_datos.commit()
+            cls.administrador_id = administrador.id
         cls.encabezados_admin = {
             "Authorization": f"Bearer {respuesta_admin.json()['token_acceso']}",
         }
@@ -169,6 +170,134 @@ class PruebasContenedores(unittest.TestCase):
                 contenedor_id=id_contenedor,
             ).count()
         self.assertEqual(registros, 2)
+
+    def test_historial_contenedor_requiere_recolector_o_admin(self):
+        codigo = "VIC:CONTENEDOR:HISTORIAL-001"
+        creacion = self.cliente.post(
+            "/contenedores/registrar-qr",
+            headers=self.encabezados,
+            json={
+                "codigo_qr": codigo,
+                "latitud": 19.4326,
+                "longitud": -99.1332,
+                "precision_m": 5.5,
+            },
+        )
+        self.assertEqual(creacion.status_code, 200, creacion.text)
+        id_contenedor = creacion.json()["contenedor"]["id"]
+
+        actualizacion = self.cliente.post(
+            "/contenedores/registrar-qr",
+            headers=self.encabezados,
+            json={
+                "codigo_qr": codigo,
+                "latitud": 19.4330,
+                "longitud": -99.1330,
+                "precision_m": 4.0,
+            },
+        )
+        self.assertEqual(actualizacion.status_code, 200, actualizacion.text)
+
+        respuesta_ciudadano = self.cliente.get(
+            f"/contenedores/{id_contenedor}/registros",
+            headers=self.encabezados_ciudadano,
+        )
+        self.assertEqual(respuesta_ciudadano.status_code, 403, respuesta_ciudadano.text)
+
+        respuesta_recolector = self.cliente.get(
+            f"/contenedores/{id_contenedor}/registros",
+            headers=self.encabezados,
+        )
+        self.assertEqual(respuesta_recolector.status_code, 200, respuesta_recolector.text)
+        self.assertEqual(len(respuesta_recolector.json()), 2)
+        self.assertEqual(
+            respuesta_recolector.json()[0]["latitud"], 19.4330,
+        )
+        self.assertEqual(
+            respuesta_recolector.json()[1]["latitud"], 19.4326,
+        )
+
+    def test_historial_contenedor_admin_puede_editar_y_eliminar_registro(self):
+        codigo = "VIC:CONTENEDOR:HISTORIAL-CRUD"
+        creacion = self.cliente.post(
+            "/contenedores/registrar-qr",
+            headers=self.encabezados,
+            json={
+                "codigo_qr": codigo,
+                "latitud": 19.4326,
+                "longitud": -99.1332,
+                "precision_m": 5.5,
+            },
+        )
+        self.assertEqual(creacion.status_code, 200, creacion.text)
+        id_contenedor = creacion.json()["contenedor"]["id"]
+
+        segunda_actualizacion = self.cliente.post(
+            "/contenedores/registrar-qr",
+            headers=self.encabezados,
+            json={
+                "codigo_qr": codigo,
+                "latitud": 19.4335,
+                "longitud": -99.1325,
+                "precision_m": 4.0,
+            },
+        )
+        self.assertEqual(segunda_actualizacion.status_code, 200, segunda_actualizacion.text)
+
+        registro_manual = self.cliente.post(
+            f"/contenedores/{id_contenedor}/registros",
+            headers=self.encabezados_admin,
+            json={
+                "latitud": 19.4342,
+                "longitud": -99.1318,
+                "precision_m": 2.5,
+            },
+        )
+        self.assertEqual(registro_manual.status_code, 201, registro_manual.text)
+        self.assertEqual(registro_manual.json()["contenedor_id"], id_contenedor)
+        self.assertEqual(registro_manual.json()["usuario_id"], self.administrador_id)
+
+        registros = self.cliente.get(
+            f"/contenedores/{id_contenedor}/registros",
+            headers=self.encabezados_admin,
+        )
+        self.assertEqual(registros.status_code, 200, registros.text)
+        self.assertEqual(len(registros.json()), 3)
+
+        registro_original = registros.json()[0]
+        respuesta_edicion = self.cliente.patch(
+            f"/contenedores/{id_contenedor}/registros/{registro_original['id']}",
+            headers=self.encabezados_admin,
+            json={
+                "latitud": 19.4340,
+                "longitud": -99.1320,
+            },
+        )
+        self.assertEqual(respuesta_edicion.status_code, 200, respuesta_edicion.text)
+        self.assertEqual(respuesta_edicion.json()["latitud"], 19.4340)
+        self.assertEqual(respuesta_edicion.json()["longitud"], -99.1320)
+
+        registros_actualizados = self.cliente.get(
+            f"/contenedores/{id_contenedor}/registros",
+            headers=self.encabezados_admin,
+        )
+        self.assertEqual(registros_actualizados.status_code, 200, registros_actualizados.text)
+        self.assertEqual(len(registros_actualizados.json()), 3)
+        self.assertTrue(any(r["latitud"] == 19.4340 and r["longitud"] == -99.1320 for r in registros_actualizados.json()))
+
+        registro_a_eliminar = registros_actualizados.json()[1]
+        respuesta_eliminar = self.cliente.delete(
+            f"/contenedores/{id_contenedor}/registros/{registro_a_eliminar['id']}",
+            headers=self.encabezados_admin,
+        )
+        self.assertEqual(respuesta_eliminar.status_code, 200, respuesta_eliminar.text)
+
+        registros_final = self.cliente.get(
+            f"/contenedores/{id_contenedor}/registros",
+            headers=self.encabezados_admin,
+        )
+        self.assertEqual(registros_final.status_code, 200, registros_final.text)
+        self.assertEqual(len(registros_final.json()), 2)
 
     def test_coordenadas_invalidas_son_rechazadas(self):
         respuesta = self.cliente.post(
@@ -377,9 +506,17 @@ class PruebasContenedores(unittest.TestCase):
         self.assertEqual(todos.status_code, 200, todos.text)
         self.assertIn(reporte_id, [item["id"] for item in todos.json()])
 
-        resolucion_sin_respuesta = self.cliente.patch(
+        tomado = self.cliente.patch(
             f"/reportes/{reporte_id}/estado",
             headers=self.encabezados,
+            json={"estado": "en_revision"},
+        )
+        self.assertEqual(tomado.status_code, 200, tomado.text)
+        self.assertEqual(tomado.json()["estado"], "en_revision")
+
+        resolucion_sin_respuesta = self.cliente.patch(
+            f"/reportes/{reporte_id}/estado",
+            headers=self.encabezados_admin,
             json={"estado": "resuelto"},
         )
         self.assertEqual(resolucion_sin_respuesta.status_code, 422)
@@ -507,6 +644,27 @@ class PruebasContenedores(unittest.TestCase):
         self.assertTrue(creacion.json()["activo"])
         self.assertTrue(creacion.json()["requiere_cambio_contrasena"])
 
+        recolectores = self.cliente.get(
+            "/administracion/recolectores",
+            headers=self.encabezados_admin,
+        )
+        self.assertEqual(recolectores.status_code, 200, recolectores.text)
+        self.assertIn(usuario_id, [item["id"] for item in recolectores.json()])
+
+        creacion_admin = self.cliente.post(
+            "/administracion/usuarios",
+            headers=self.encabezados_admin,
+            json={
+                "nombre": "Segundo",
+                "apellidos": "Administrador",
+                "correo": "segundo-admin@example.com",
+                "contrasena_temporal": "Temporal#Admin2026",
+                "rol": "admin",
+            },
+        )
+        self.assertEqual(creacion_admin.status_code, 201, creacion_admin.text)
+        self.assertEqual(creacion_admin.json()["rol"], "admin")
+
         inicio = self.cliente.post(
             "/autenticacion/iniciar-sesion",
             json={
@@ -531,6 +689,14 @@ class PruebasContenedores(unittest.TestCase):
         )
         self.assertEqual(cambio.status_code, 200, cambio.text)
 
+        restablecimiento = self.cliente.post(
+            f"/administracion/usuarios/{usuario_id}/restablecer-contrasena",
+            headers=self.encabezados_admin,
+            json={"contrasena_temporal": "NuevaTemporal#2026"},
+        )
+        self.assertEqual(restablecimiento.status_code, 200, restablecimiento.text)
+        self.assertTrue(restablecimiento.json()["requiere_cambio_contrasena"])
+
         suspension = self.cliente.patch(
             f"/administracion/usuarios/{usuario_id}",
             headers=self.encabezados_admin,
@@ -549,7 +715,7 @@ class PruebasContenedores(unittest.TestCase):
             "/autenticacion/iniciar-sesion",
             json={
                 "correo": "nuevo-recolector@example.com",
-                "contrasena": "Definitiva#2026",
+                "contrasena": "NuevaTemporal#2026",
             },
         )
         self.assertEqual(inicio_suspendido.status_code, 403, inicio_suspendido.text)

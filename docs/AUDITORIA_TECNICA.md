@@ -47,6 +47,7 @@ Todavía no existen tablas ni endpoints para administrar avisos.
 - Consultar contenedores dentro de 1, 5 o 10 kilómetros.
 - Ordenar por distancia y seleccionar marcadores o elementos de la lista.
 - Permitir el registro o actualización por QR a cualquier usuario autenticado.
+- Permitir a administradores editar o eliminar registros de historial de detección de contenedores.
 
 ### Rutas semanales
 
