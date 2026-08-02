@@ -9,22 +9,21 @@ mkdir -p "$(dirname "$DESTINO")"
 TEMPORAL="$(mktemp "${DESTINO}.XXXXXX")"
 trap 'rm -f "$TEMPORAL"' EXIT
 
-ESTADO_UFW="$(ufw status verbose 2>/dev/null || true)"
-if grep -q '^Status: active' <<<"$ESTADO_UFW"; then
+if grep -q '^ENABLED=yes' /etc/ufw/ufw.conf 2>/dev/null; then
   ACTIVO=1
 else
   ACTIVO=0
 fi
 
-if grep -Eq '^Default: deny \(incoming\)' <<<"$ESTADO_UFW"; then
+if grep -q '^DEFAULT_INPUT_POLICY="DROP"' /etc/default/ufw 2>/dev/null; then
   ENTRADA_DENEGADA=1
 else
   ENTRADA_DENEGADA=0
 fi
 
-REGLAS="$(ufw status numbered 2>/dev/null | grep -Ec '^\[[[:space:]]*[0-9]+\]' || true)"
+REGLAS="$(grep -h '^### tuple ###' /etc/ufw/user.rules /etc/ufw/user6.rules 2>/dev/null | wc -l || true)"
 DESDE="$(date --date="-${VENTANA_SEGUNDOS} seconds" '+%Y-%m-%d %H:%M:%S')"
-REGISTROS="$(journalctl --no-pager -k --since "$DESDE" 2>/dev/null || true)"
+REGISTROS="$(journalctl --no-pager -k --since "$DESDE" --grep='\[UFW (BLOCK|ALLOW)\]' 2>/dev/null || true)"
 BLOQUEOS="$(grep -c '\[UFW BLOCK\]' <<<"$REGISTROS" || true)"
 PERMITIDOS="$(grep -c '\[UFW ALLOW\]' <<<"$REGISTROS" || true)"
 

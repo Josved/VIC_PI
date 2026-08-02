@@ -1,9 +1,9 @@
 [Unit]
-Description=Actualiza las metricas de UFW cada 30 segundos
+Description=Actualiza las metricas de UFW cada 60 segundos
 
 [Timer]
 OnBootSec=15s
-OnUnitActiveSec=30s
+OnUnitActiveSec=60s
 AccuracySec=5s
 Persistent=true
 

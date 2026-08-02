@@ -27,7 +27,7 @@ La aplicación se abre desde la computadora anfitriona en
 - Hash y cifrado: bcrypt para contraseñas y hashes HMAC para códigos temporales.
 - Monitoreo: Prometheus, Grafana, Node Exporter y cAdvisor.
 - Firewall: UFW con política de denegación por defecto y métricas de estado,
-  reglas y bloqueos exportadas cada 30 segundos.
+  reglas y bloqueos exportadas cada 60 segundos.
 - JWT: la API conserva la autenticación y autorización por roles con JWT.
 - SSL: Nginx termina TLS; el laboratorio usa un certificado autofirmado.
 - Balanceador: Nginx distribuye `/api` entre `backend-a` y `backend-b`.

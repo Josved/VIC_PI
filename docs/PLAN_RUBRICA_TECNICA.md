@@ -54,7 +54,7 @@ inicio de sesión de `root` están deshabilitados.
 | `GET /api/metricas` desde el público | Métricas no expuestas | 404 |
 | `GET /grafana/` | Redirección al acceso de Grafana | 301 |
 | Prometheus | Todos los objetivos disponibles | 6 de 6 en estado `up` después de desplegar el exporter público |
-| Monitoreo UFW | Ambos firewalls visibles | Estado, política, reglas y bloqueos exportados cada 30 segundos |
+| Monitoreo UFW | Ambos firewalls visibles | Estado, política, reglas y bloqueos exportados cada 60 segundos |
 | Datos migrados | Información de demostración en el privado | 4 usuarios, 6 contenedores, 5 rutas y 3 reportes |
 
 La base de datos anterior al reemplazo quedó respaldada dentro del servidor
