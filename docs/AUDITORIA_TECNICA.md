@@ -39,7 +39,7 @@ La integración conserva los cambios de `main` y de `josved-seguridad-recuperaci
 ## Pendientes reales
 
 - Publicar la Web y la API en el proveedor gratuito elegido.
-- El push remoto Android queda fuera del alcance: la presentación móvil usará Expo Go.
+- Generar y probar la APK Android cuando estén disponibles la URL pública y los teléfonos.
 - Evaluar migración de SQLite a PostgreSQL cuando haya varios usuarios concurrentes en producción.
 - Actualizar Expo en una tarea independiente; `npm audit` reporta avisos moderados en dependencias internas de las herramientas Expo y la corrección automática propone cambios incompatibles.
 - Sustituir OSRM/Nominatim públicos por servicios locales si la LAN debe funcionar sin internet.

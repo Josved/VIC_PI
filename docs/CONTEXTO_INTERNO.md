@@ -91,8 +91,8 @@ El registro público siempre crea ciudadanos. Recolectores y administradores sol
 
 - Backend, frontend y base de datos funcionan en Docker.
 - SMTP real está configurado localmente y no se versiona.
-- La entrega móvil usa Expo Go. Los mensajes dentro de la aplicación funcionan;
-  el push remoto Android se omite deliberadamente porque Expo Go no lo soporta.
+- La entrega móvil utilizará una APK. Los mensajes y notificaciones locales
+  funcionan; el push remoto se configurará opcionalmente con FCM.
 - OSRM/Nominatim públicos requieren internet; para LAN sin internet se debe habilitar el servicio OSRM local.
 - La versión web se sirve por Nginx con HTTPS autofirmado en la simulación.
 

@@ -41,8 +41,8 @@ Documentación oficial:
 
 ## Google Cloud para una compilación propia futura
 
-Esta sección no aplica a la entrega actual con Expo Go. Solo sería necesaria si
-en el futuro se generara una aplicación Android/iOS independiente.
+Esta sección aplica a la APK Android si se utiliza una clave propia de Google
+Maps. La Web conserva Leaflet/OpenStreetMap.
 
 Crear un proyecto de Google Cloud con facturación habilitada y activar:
 
@@ -101,10 +101,10 @@ el puerto de la API.
 `VIC_ALLOW_INSECURE_HTTP=true` identifica la configuración de laboratorio. La
 URL HTTP solo debe utilizarse en una red privada; la Web publicada usa HTTPS.
 
-## Builds instalables (fuera del alcance actual)
+## Build instalable
 
-El proyecto conserva un archivo `frontend/eas.json` como referencia histórica,
-pero no se ejecutará EAS ni se generará una APK para esta presentación.
+El perfil `preview` de `frontend/eas.json` genera la APK que se instalará en los
+teléfonos de la presentación.
 
 Configurar en el entorno `preview` de EAS:
 

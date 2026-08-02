@@ -165,8 +165,8 @@ permisos de los contenedores.
 
 ## Límites deliberados de esta etapa
 
-- La aplicación móvil se abre con Expo Go y Metro; no se compila un APK ni se
-  ejecuta dentro de un contenedor.
+- La aplicación móvil se entrega como APK; no se ejecuta dentro de un
+  contenedor.
 - Nominatim continúa siendo externo, aunque `VIC_GEOCODING_URL` permite apuntar
   a una futura instancia propia.
 - TLS, balanceo, firewall, monitoreo y separación público/privado se encuentran

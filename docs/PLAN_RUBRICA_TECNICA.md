@@ -41,8 +41,8 @@ inicio de sesión de `root` están deshabilitados.
 | Formularios validados | Cumple | Validación en interfaz y esquemas Pydantic en la API |
 | Datos móviles visibles en Web | Cumple | Aplicación web y móvil consumen la misma API y base de datos |
 | Web, API y BD en nube | Simulación lista; despliegue real pendiente | CloudFormation reproduce dos EC2, VPC, Security Groups, discos cifrados y arranque automático; no se ejecutó para evitar consumo |
-| Aplicación móvil 100 % funcional | Preparada para Expo Go; prueba física aplazada | Funciones listas y el módulo incompatible de push remoto se omite dentro de Expo Go; no se generará APK |
-| Teléfono para evaluadores | Aplazado por decisión del equipo | En la fase práctica se abrirá el QR del proyecto directamente con Expo Go |
+| Aplicación móvil 100 % funcional | Preparada para APK; compilación aplazada | `expo-dev-client` y los perfiles APK están configurados; la compilación se hará cuando la URL pública y las credenciales Expo estén listas |
+| Teléfono para evaluadores | Pendiente de la fase práctica | Se instalará la APK `preview` en los teléfonos y se prepararán las cuentas de demostración |
 
 ## Validación ejecutada
 

@@ -14,6 +14,7 @@
     "expo-build-properties": "~1.0.10",
     "expo-camera": "~17.0.10",
     "expo-constants": "~18.0.13",
+    "expo-dev-client": "~6.0.21",
     "expo-image-picker": "~17.0.11",
     "expo-location": "~19.0.8",
     "expo-notifications": "~0.32.17",
@@ -37,10 +38,13 @@
   },
   "scripts": {
     "start": "expo start",
+    "start:dev-client": "expo start --dev-client",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "typecheck": "expo export --platform web --output-dir .expo-check --clear"
+    "typecheck": "expo export --platform web --output-dir .expo-check --clear",
+    "build:android:development": "npx eas-cli@latest build --platform android --profile development",
+    "build:android:preview": "npx eas-cli@latest build --platform android --profile preview"
   },
   "overrides": {
     "postcss": "8.5.25"
