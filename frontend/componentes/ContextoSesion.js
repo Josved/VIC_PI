@@ -1,10 +1,13 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
+import {
+  eliminarDatoSeguro,
+  guardarDatoSeguro,
+  leerDatoSeguro,
+} from './almacenamientoSeguro';
 import { conexionApi, guardarTokenAutorizacion } from './conexionApi';
 
 const CLAVE_SESION = '@vic/sesion';
-
 const ContextoSesion = createContext(null);
 
 export function ProveedorSesion({ children }) {
@@ -14,7 +17,7 @@ export function ProveedorSesion({ children }) {
   useEffect(() => {
     async function cargarSesionGuardada() {
       try {
-        const textoSesion = await AsyncStorage.getItem(CLAVE_SESION);
+        const textoSesion = await leerDatoSeguro(CLAVE_SESION);
         if (textoSesion) {
           const sesionGuardada = JSON.parse(textoSesion);
           if (!sesionGuardada?.token_acceso || !sesionGuardada?.usuario) {
@@ -27,12 +30,12 @@ export function ProveedorSesion({ children }) {
             usuario: respuesta.data,
           };
           cambiarSesion(sesionActualizada);
-          await AsyncStorage.setItem(CLAVE_SESION, JSON.stringify(sesionActualizada));
+          await guardarDatoSeguro(CLAVE_SESION, JSON.stringify(sesionActualizada));
         }
       } catch {
         guardarTokenAutorizacion(null);
         cambiarSesion(null);
-        await AsyncStorage.removeItem(CLAVE_SESION);
+        await eliminarDatoSeguro(CLAVE_SESION);
       } finally {
         cambiarCargando(false);
       }
@@ -44,7 +47,7 @@ export function ProveedorSesion({ children }) {
   async function guardarSesion(nuevaSesion) {
     cambiarSesion(nuevaSesion);
     guardarTokenAutorizacion(nuevaSesion.token_acceso);
-    await AsyncStorage.setItem(CLAVE_SESION, JSON.stringify(nuevaSesion));
+    await guardarDatoSeguro(CLAVE_SESION, JSON.stringify(nuevaSesion));
   }
 
   async function iniciarSesion(datos) {
@@ -54,17 +57,30 @@ export function ProveedorSesion({ children }) {
 
   async function registrarCuenta(datos) {
     const respuesta = await conexionApi.post('/autenticacion/registro', datos);
+    return respuesta.data;
+  }
+
+  async function verificarCorreo(datos) {
+    const respuesta = await conexionApi.post('/autenticacion/verificar-correo', datos);
     await guardarSesion(respuesta.data);
+  }
+
+  async function reenviarVerificacion(correo) {
+    await conexionApi.post('/autenticacion/reenviar-verificacion', { correo });
   }
 
   async function pedirRecuperacionContrasena(correo) {
     await conexionApi.post('/autenticacion/recuperar-contrasena', { correo });
   }
 
+  async function restablecerContrasena(datos) {
+    await conexionApi.post('/autenticacion/restablecer-contrasena', datos);
+  }
+
   async function cerrarSesion() {
     cambiarSesion(null);
     guardarTokenAutorizacion(null);
-    await AsyncStorage.removeItem(CLAVE_SESION);
+    await eliminarDatoSeguro(CLAVE_SESION);
   }
 
   async function refrescarUsuario() {
@@ -74,7 +90,7 @@ export function ProveedorSesion({ children }) {
     const respuesta = await conexionApi.get('/autenticacion/mi-usuario');
     const nuevaSesion = { ...sesion, usuario: respuesta.data };
     cambiarSesion(nuevaSesion);
-    await AsyncStorage.setItem(CLAVE_SESION, JSON.stringify(nuevaSesion));
+    await guardarDatoSeguro(CLAVE_SESION, JSON.stringify(nuevaSesion));
     return respuesta.data;
   }
 
@@ -85,7 +101,10 @@ export function ProveedorSesion({ children }) {
       cargando,
       iniciarSesion,
       registrarCuenta,
+      verificarCorreo,
+      reenviarVerificacion,
       pedirRecuperacionContrasena,
+      restablecerContrasena,
       refrescarUsuario,
       cerrarSesion,
     }),

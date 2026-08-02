@@ -297,6 +297,21 @@ export function PantallaAdministracion() {
     }
   }
 
+  function confirmarEliminacionRegistro(registroId) {
+    Alert.alert(
+      'Eliminar registro',
+      'Esta ubicación desaparecerá del historial del contenedor.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => eliminarRegistroHistorial(registroId),
+        },
+      ],
+    );
+  }
+
   async function crearRegistroHistorial() {
     if (!contenedorSeleccionado) {
       cambiarError('Selecciona un contenedor para agregar un registro.');
@@ -364,12 +379,12 @@ export function PantallaAdministracion() {
         precision_m: contenedorFormulario.precision_m
           ? Number(contenedorFormulario.precision_m)
           : undefined,
-        direccion_completa: contenedorFormulario.direccion_completa || undefined,
-        calle: contenedorFormulario.calle || undefined,
-        numero: contenedorFormulario.numero || undefined,
-        colonia: contenedorFormulario.colonia || undefined,
-        codigo_postal: contenedorFormulario.codigo_postal || undefined,
-        municipio: contenedorFormulario.municipio || undefined,
+        direccion_completa: contenedorFormulario.direccion_completa.trim() || null,
+        calle: contenedorFormulario.calle.trim() || null,
+        numero: contenedorFormulario.numero.trim() || null,
+        colonia: contenedorFormulario.colonia.trim() || null,
+        codigo_postal: contenedorFormulario.codigo_postal.trim() || null,
+        municipio: contenedorFormulario.municipio.trim() || null,
       };
       const respuesta = await conexionApi.patch(
         `/contenedores/${contenedorSeleccionado.id}`,
@@ -404,6 +419,21 @@ export function PantallaAdministracion() {
     } finally {
       cambiarContenedorProcesando(false);
     }
+  }
+
+  function confirmarEliminacionContenedor(id) {
+    Alert.alert(
+      'Eliminar contenedor',
+      'Esta acción no se puede deshacer. Solo se permitirá si el contenedor no está relacionado con reportes o rutas.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => eliminarContenedor(id),
+        },
+      ],
+    );
   }
 
   async function crearContenedor() {
@@ -780,7 +810,7 @@ export function PantallaAdministracion() {
               <Boton
                 texto="Eliminar contenedor"
                 variante="fantasma"
-                alPresionar={() => eliminarContenedor(contenedorSeleccionado.id)}
+                alPresionar={() => confirmarEliminacionContenedor(contenedorSeleccionado.id)}
               />
             </View>
             <Text style={estilos.subtitulo}>Historial de ubicaciones</Text>
@@ -874,7 +904,7 @@ export function PantallaAdministracion() {
                       <Pressable
                         accessibilityRole="button"
                         disabled={registroProcesando}
-                        onPress={() => eliminarRegistroHistorial(registro.id)}
+                        onPress={() => confirmarEliminacionRegistro(registro.id)}
                         style={estilos.botonAccion}
                       >
                         <Text style={estilos.textoAccion}>Eliminar</Text>

@@ -38,6 +38,7 @@ class UsuarioRespuesta(BaseModel):
     rol: RolUsuario
     activo: bool = True
     requiere_cambio_contrasena: bool = False
+    correo_verificado: bool = True
     creado_en: datetime
     actualizado_en: datetime
 
@@ -48,7 +49,7 @@ class RegistroEntrada(BaseModel):
     nombre: str = Field(min_length=2, max_length=50, pattern=PATRON_NOMBRE)
     apellidos: str = Field(min_length=2, max_length=50, pattern=PATRON_NOMBRE)
     correo: EmailStr
-    contrasena: str = Field(min_length=6, max_length=72)
+    contrasena: str = Field(min_length=8, max_length=72)
 
     model_config = {"extra": "forbid"}
 
@@ -63,8 +64,29 @@ class RecuperarContrasenaEntrada(BaseModel):
 
 
 class RestablecerContrasenaEntrada(BaseModel):
-    token: str
-    contrasena: str = Field(min_length=6, max_length=72)
+    correo: EmailStr
+    codigo: str = Field(min_length=8, max_length=8, pattern=r"^[A-Za-z0-9]{8}$")
+    contrasena_nueva: str = Field(min_length=8, max_length=72)
+
+    model_config = {"extra": "forbid"}
+
+
+class RegistroPendienteRespuesta(BaseModel):
+    mensaje: str
+    requiere_verificacion: bool = True
+
+
+class VerificarCorreoEntrada(BaseModel):
+    correo: EmailStr
+    codigo: str = Field(min_length=8, max_length=8, pattern=r"^[A-Za-z0-9]{8}$")
+
+    model_config = {"extra": "forbid"}
+
+
+class ReenviarVerificacionEntrada(BaseModel):
+    correo: EmailStr
+
+    model_config = {"extra": "forbid"}
 
 
 class SesionRespuesta(BaseModel):
@@ -129,7 +151,7 @@ class ContenedorActualizar(BaseModel):
 
     @model_validator(mode="after")
     def validar_al_menos_un_campo(self):
-        if all(value is None for value in self.model_dump().values()):
+        if not self.model_fields_set:
             raise ValueError("Al menos un campo debe actualizarse")
         return self
 
@@ -153,7 +175,7 @@ class RegistroUbicacionContenedorActualizar(BaseModel):
 
     @model_validator(mode="after")
     def validar_al_menos_un_campo(self):
-        if all(value is None for value in self.model_dump().values()):
+        if not self.model_fields_set:
             raise ValueError("Al menos un campo debe actualizarse")
         return self
 
@@ -227,6 +249,7 @@ class UsuarioAdministradoRespuesta(BaseModel):
     rol: RolUsuario
     activo: bool
     requiere_cambio_contrasena: bool
+    correo_verificado: bool
     creado_en: datetime
     actualizado_en: datetime
 

@@ -1,195 +1,112 @@
-# Contexto Interno del Proyecto VIC
+# Contexto interno del proyecto VIC
 
-> Archivo de referencia para el equipo y para la asistencia automática. Usar cada vez que se trabaje en el proyecto para mantener el contexto.
+Actualizado: 2026-08-02
 
-## Objetivo del proyecto
+## Objetivo
 
-VIC es una aplicación móvil universitaria para:
-- localizar contenedores de reciclaje,
-- consultar calendarios de recolección,
-- reportar contenedores y situaciones,
-- gestionar rutas de recolección y personal,
-- administrar usuarios, vehículos y recorridos.
+VIC es una aplicación Expo/React Native con API FastAPI para gestionar contenedores, reportes ciudadanos, rutas de recolección, operación de recolectores y administración del personal.
 
-## Estructura general del repositorio
+## Stack
 
-- `backend/`: API en Python con FastAPI, SQLAlchemy y SQLite.
-- `frontend/`: aplicación Expo React Native en JavaScript con soporte móvil y web.
-- `docs/`: documentación técnica y de despliegue.
-- `scripts/`: utilidades de PowerShell para Docker y respaldo.
-- `compose.yaml`, `compose.osrm.yaml`: despliegue Docker del backend, frontend y servicios.
+- Backend: Python, FastAPI, SQLAlchemy, SQLite, JWT, bcrypt y SMTP con TLS.
+- Frontend: Expo SDK 54, React Native, React Navigation, Axios, mapas, cámara, ubicación y notificaciones locales.
+- Despliegue: Docker Compose, Nginx y volumen persistente `vic_data`.
 
-## Stack principal
+## Roles
 
-### Backend
-- Python 3.14
-- FastAPI
-- Uvicorn
-- SQLAlchemy 2
-- Pydantic v2
-- SQLite
-- JWT con `python-jose`
-- Hashing con `bcrypt` y `passlib`
-- Soporte de multipart para cargas de archivos
+- `citizen`: consulta mapas/calendario, registra ubicación por QR, crea reportes y consulta sus respuestas.
+- `collector`: además gestiona rutas asignadas, recorridos, GPS, paradas e incidencias.
+- `admin`: administra usuarios, vehículos, reportes, rutas, contenedores e historial de ubicaciones.
 
-### Frontend
-- Expo (React Native)
-- React 19
-- React Navigation
-- Axios para HTTP
-- Expo Location, Camera, Image Picker, Notifications, Task Manager
-- Leaflet y `react-native-maps` para mapas
-- `@react-native-async-storage/async-storage` para sesión local
+El registro público siempre crea ciudadanos. Recolectores y administradores solo pueden ser creados o asignados desde administración.
 
-## Archivos y carpetas clave
+## Autenticación y seguridad
 
-### Backend importantes
-- `backend/app/principal.py`: entrada de la aplicación, configuración CORS, rutas y archivos estáticos.
-- `backend/app/configuracion.py`: parámetros de entorno, URLs de Servicios OSRM/Nominatim y rutas de evidencia.
-- `backend/app/base_datos.py`: sesión de SQLAlchemy y conexión a SQLite.
-- `backend/app/autenticacion.py`: registro, inicio de sesión, token JWT, validación de usuario y control de cuentas.
-- `backend/app/contenedores.py`: registro de contenedores por QR, consulta de contenedores cercanos, detalle y listado.
-- `backend/app/reportes.py`: creación de reportes, consulta propios y de administradores, cambio de estado.
-- `backend/app/rutas.py`: creación/actualización de rutas, asignación de recolectores, configuración vial y cálculo de recorridos.
-- `backend/app/operacion.py`: inicio y seguimiento de recorridos, ubicación en tiempo real, historial, incidencias y cancelaciones.
-- `backend/app/administracion.py`: gestión de usuarios, roles, suspensión, restablecimiento de contraseñas y vehículos.
-- `backend/app/geografia.py`: geocodificación inversa y búsqueda de direcciones con Nominatim.
-- `backend/app/modelos.py`: definición del modelo de datos y tablas principales.
-- `backend/app/esquemas.py`: contratos de entrada/salida de la API.
+- Las cuentas ciudadanas nuevas deben verificar su correo mediante un código real de ocho caracteres.
+- Los códigos de verificación y recuperación son aleatorios, se guardan como HMAC, vencen, son de un solo uso y tienen límites de solicitudes e intentos.
+- La recuperación de contraseña envía correo real por SMTP y revoca las sesiones anteriores.
+- Las contraseñas se almacenan con bcrypt; los JWT incluyen expiración y versión de sesión.
+- Android/iOS almacena la sesión con `expo-secure-store`; web utiliza AsyncStorage como compatibilidad.
+- Docker rechaza secretos JWT predeterminados en producción.
+- Las credenciales SMTP solo viven en `.env`, que está ignorado por Git.
 
-### Frontend importantes
-- `frontend/App.js`: raíz de navegación y selección de flujo entre sesión y app principal.
-- `frontend/componentes/ContextoSesion.js`: proveedor de sesión, almacenamiento local de token y refresco de usuario.
-- `frontend/componentes/conexionApi.js`: configuración de Axios y manejo de token Authorization.
-- `frontend/componentes/tema.js`: paleta de colores y espaciado global.
-- `frontend/Pantallas/`: pantallas principales del app.
-  - `PantallaInicio.js`: calendario, avisos, notificaciones y estado de rutas.
-  - `PantallaContenedores.js`: mapa de contenedores, permisos de ubicación, búsqueda cercana y registro QR.
-  - `PantallaReportes.js`: envío y consulta de reportes.
-  - `PantallaRutas.js`: administración de rutas, edición y seguimiento para roles collector/admin.
-  - `PantallaAdministracion.js`: administración de usuarios y vehículos para admin.
-  - `PantallaPerfil.js`: datos de usuario y cierre de sesión.
-  - `PantallaInicioSesion.js`, `PantallaRegistro.js`, `PantallaRecuperarContrasena.js`: flujo de autenticación.
+## Funciones actuales
 
-## Roles y permisos
+### Ciudadano
 
-- `citizen`: usuario básico. Puede registrar contenedores por QR, ver contenedores cercanos, consultar calendario, enviar reportes y ver su perfil.
-- `collector`: recolector. Puede ver rutas, iniciar recorridos, actualizar ubicación, atender paradas, registrar incidencias y ver el historial.
-- `admin`: administrador. Puede gestionar usuarios, asignar roles, suspender cuentas, restablecer contraseñas, gestionar vehículos, ver todas las rutas y reportes.
+- Registro y verificación de correo.
+- Inicio de sesión, recuperación y cambio de contraseña.
+- Mapa y búsqueda de contenedores cercanos.
+- Registro/actualización de ubicación mediante QR.
+- Creación y seguimiento de reportes propios.
+- Calendario semanal de recolección y mapa de la ruta seleccionada.
+- Consulta del progreso y ubicación disponible de recorridos.
 
-## Modelo de datos resumen
+### Recolector
 
-- `usuarios`: usuarios de la app.
-- `control_usuarios`: estado activo/suspendido y si requieren cambio de contraseña.
-- `contenedores`: contenedores registrados por QR con coordenadas y contador de registros.
-- `registros_ubicacion_contenedor`: historial de ubicaciones guardadas por cada registro de QR.
-- `reportes`: reportes de contenedores con motivo, comentario, evidencia y estado.
-- `rutas_recoleccion`: rutas programadas con día, hora, zona, descripción y estado activo.
-- `rutas_contenedores`: contenedores ordenados en cada ruta.
-- `asignaciones_ruta`: recolector asignado a una ruta.
-- `vehiculos`: vehículos activos/inactivos.
-- `ejecuciones_ruta`: recorridos activos o finalizados por recolectores.
-- `paradas_ejecucion_ruta`: paradas de cada recorrido y su estado.
-- `ubicaciones_ejecucion_ruta`: ubicaciones GPS registradas durante los recorridos.
-- `incidencias_operativa`: incidencias o problemas creados por el recolector.
-- `puntos_ruta`, `configuracion_ruta_vial`, `ruta_ejecucion_vial`: datos de cálculo de ruta vial y geometría.
+- Consulta de rutas asignadas.
+- Inicio, seguimiento, finalización o cancelación de recorridos.
+- Actualización GPS y conservación de historial.
+- Atención de paradas e incidencias operativas.
+- Consulta del historial de ubicación de contenedores.
 
-## Endpoints más importantes
+### Administrador
 
-### Autenticación
-- `POST /autenticacion/registro`
-- `POST /autenticacion/iniciar-sesion`
-- `POST /autenticacion/recuperar-contrasena`
-- `POST /autenticacion/restablecer-contrasena`
-- `GET /autenticacion/mi-usuario`
-- `POST /autenticacion/cambiar-contrasena`
+- Creación de cuentas autorizadas y contraseñas temporales.
+- Cambio de roles, suspensión, reactivación y restablecimiento de contraseña.
+- Gestión de vehículos por placa.
+- Gestión de reportes y respuestas al ciudadano.
+- Creación/edición de rutas, puntos, orden, horarios, vehículo y recolector.
+- Alta, edición y eliminación protegida de contenedores.
+- Alta, edición y eliminación del historial de ubicaciones.
 
-### Contenedores
-- `POST /contenedores/registrar-qr`
-- `GET /contenedores/cercanos`
-- `GET /contenedores/{contenedor_id}`
-- `GET /contenedores`
+## Módulos principales
 
-### Reportes
-- `POST /reportes`
-- `GET /reportes/mios`
-- `GET /reportes`
-- `PATCH /reportes/{reporte_id}/estado`
+- `backend/app/autenticacion.py`: sesión, verificación de correo y recuperación.
+- `backend/app/correo.py`: envío SMTP con TLS.
+- `backend/app/contenedores.py`: QR, mapa, CRUD e historial.
+- `backend/app/reportes.py`: reportes ciudadanos y atención por roles.
+- `backend/app/rutas.py`: calendario, rutas viales, asignaciones y geometría.
+- `backend/app/operacion.py`: recorrido, GPS, paradas e incidencias.
+- `backend/app/administracion.py`: usuarios y vehículos.
+- `backend/app/geografia.py`: direcciones con Nominatim.
+- `backend/app/modelos.py`: tablas SQLAlchemy.
+- `backend/app/migraciones.py`: compatibilidad con bases SQLite existentes.
+- `frontend/componentes/ContextoSesion.js`: sesión y API de autenticación.
+- `frontend/componentes/almacenamientoSeguro.js`: SecureStore nativo.
+- `frontend/Pantallas/PantallaAdministracion.js`: panel administrativo completo.
 
-### Rutas y operación
-- `GET /rutas`
-- `GET /rutas/mias`
-- `POST /rutas`
-- `PATCH /rutas/{ruta_id}`
-- `POST /rutas/{ruta_id}/recalcular`
-- `GET /operacion/mi-recorrido-activo`
-- `GET /operacion/historial`
-- `GET /operacion/ejecuciones/{ejecucion_id}`
-- `POST /operacion/rutas/{ruta_id}/iniciar`
-- `POST /operacion/ejecuciones/{ejecucion_id}/ubicacion`
-- `PATCH /operacion/ejecuciones/{ejecucion_id}/paradas/{parada_id}`
-- `POST /operacion/ejecuciones/{ejecucion_id}/incidencias`
-- `POST /operacion/ejecuciones/{ejecucion_id}/cancelar`
+## Tablas principales
 
-### Administración
-- `GET /administracion/usuarios`
-- `GET /administracion/recolectores`
-- `POST /administracion/usuarios`
-- `PATCH /administracion/usuarios/{usuario_id}`
-- `POST /administracion/usuarios/{usuario_id}/restablecer-contrasena`
-- `GET /administracion/vehiculos`
-- `POST /administracion/vehiculos`
-- `PATCH /administracion/vehiculos/{vehiculo_id}`
+- `usuarios`, `control_usuarios`.
+- `verificaciones_correo`, `recuperaciones_contrasena`.
+- `contenedores`, `detalles_contenedor`, `registros_ubicacion_contenedor`.
+- `reportes`.
+- `rutas_recoleccion`, `rutas_contenedores`, `asignaciones_ruta`.
+- `vehiculos`, `configuraciones_ruta_vial`, `puntos_ruta`.
+- `ejecuciones_ruta`, `paradas_ejecucion_ruta`, `ubicaciones_ejecucion_ruta`.
+- `incidencias_operativas`, `rutas_ejecucion_vial`.
 
-### Geografía
-- `GET /geografia/direccion`
-- `GET /geografia/buscar`
+## Estado conocido
 
-## Ejecución y ambiente local
+- Backend, frontend y base de datos funcionan en Docker.
+- SMTP real está configurado localmente y no se versiona.
+- Las notificaciones dentro de la aplicación funcionan; el push remoto Android necesita development build y configuración FCM, porque Expo Go no lo soporta.
+- OSRM/Nominatim públicos requieren internet; para LAN sin internet se debe habilitar el servicio OSRM local.
+- La versión web se sirve por Nginx; producción debe usar HTTPS.
 
-### Backend
+## Validación
+
 ```powershell
-cd backend
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
-.\.venv\Scripts\python.exe -m uvicorn app.principal:aplicacion --host 0.0.0.0 --port 8000 --reload
+cd "C:\PROGRAMACION\PI\PROYECTO INTEGRADOR\backend"
+& .\.venv\Scripts\python.exe -m unittest discover -s tests -v
+
+cd "C:\PROGRAMACION\PI\PROYECTO INTEGRADOR\frontend"
+npm run typecheck
+
+cd "C:\PROGRAMACION\PI\PROYECTO INTEGRADOR"
+docker compose up -d --build
+docker compose ps
 ```
 
-### Frontend Web
-```powershell
-cd frontend
-$env:EXPO_PUBLIC_API_URL="http://127.0.0.1:8000"
-npx expo start --web -c
-```
-
-### Frontend Expo Go
-```powershell
-cd frontend
-$env:EXPO_PUBLIC_API_URL="http://<IP_LOCAL>:8000"
-npm start
-```
-
-## Notas importantes
-
-- El backend usa SQLite por defecto en `sqlite:///./vic.db`.
-- La recuperación de contraseña está preparada, pero el envío de correo y el token real no están implementados.
-- La app móvil usa `AsyncStorage` para persistir la sesión.
-- `frontend/componentes/conexionApi.js` define `URL_API` usando `EXPO_PUBLIC_API_URL`.
-- La geocodificación usa Nominatim y la ruta vial usa OSRM por defecto.
-- Las evidencias se sirven como archivos estáticos desde la ruta `configuracion.url_publica_evidencias`.
-- `docs/PROJECT_CONTEXT.md` ya existe y cubre parte del proyecto; este documento es la referencia directa y actualizada para el equipo.
-
-## Referencias internas
-- `README.md`: arranque rápido y despliegue Docker.
-- `docs/PROJECT_CONTEXT.md`: contexto general y reglas de trabajo del equipo.
-- `docs/DESPLIEGUE_LAN.md`: despliegue LAN y configuración Docker.
-- `docs/MAPAS_QR.md`: configuraciones de mapas, GPS y QR.
-- `docs/INTEGRACION_VICTOR.md`: integración con módulo adicional.
-- `docs/VALIDACION_MAPAS_QR.md`: pruebas de mapas y QR.
-
-## Para el asistente
-Mantener este archivo como el contexto base del proyecto y usarlo en cada sesión.
-
----
-
-Archivo creado para `VIC_PI` como punto de arranque y referencia rápida.
+No agregar dependencias descargadas, entornos virtuales, bases de datos, credenciales ni carpetas de herramientas de análisis al repositorio.

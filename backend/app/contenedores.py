@@ -2,6 +2,7 @@ from math import asin, cos, radians, sin, sqrt
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .autenticacion import obtener_usuario_actual
@@ -322,22 +323,27 @@ def actualizar_contenedor(
         contenedor.actualizado_en = ahora_utc()
         contenedor.actualizado_por_id = _administrador.id
 
-    campos_direccion = {
-        "direccion_completa": cambios.get("direccion_completa"),
-        "calle": cambios.get("calle"),
-        "numero": cambios.get("numero"),
-        "colonia": cambios.get("colonia"),
-        "codigo_postal": cambios.get("codigo_postal"),
-        "municipio": cambios.get("municipio"),
+    nombres_campos_direccion = {
+        "direccion_completa",
+        "calle",
+        "numero",
+        "colonia",
+        "codigo_postal",
+        "municipio",
     }
-    if any(value is not None for value in campos_direccion.values()):
+    campos_direccion = {
+        campo: cambios[campo]
+        for campo in nombres_campos_direccion
+        if campo in cambios
+    }
+    if campos_direccion:
         detalle = base_datos.get(DetalleContenedor, contenedor.id)
         if not detalle:
             detalle = DetalleContenedor(contenedor_id=contenedor.id)
             base_datos.add(detalle)
         for campo, valor in campos_direccion.items():
-            if valor is not None:
-                setattr(detalle, campo, valor.strip() or None)
+            valor_limpio = valor.strip() if valor else None
+            setattr(detalle, campo, valor_limpio or None)
         detalle.actualizado_en = ahora_utc()
 
     base_datos.commit()
@@ -358,7 +364,17 @@ def eliminar_contenedor(
             detail="Contenedor no encontrado",
         )
     base_datos.delete(contenedor)
-    base_datos.commit()
+    try:
+        base_datos.commit()
+    except IntegrityError as error:
+        base_datos.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "No se puede eliminar el contenedor porque está relacionado "
+                "con reportes, rutas u operaciones"
+            ),
+        ) from error
     return {"mensaje": "Contenedor eliminado"}
 
 

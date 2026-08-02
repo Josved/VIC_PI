@@ -138,6 +138,8 @@ class ControlUsuario(Base):
         nullable=False,
         default=False,
     )
+    correo_verificado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    version_sesion: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     actualizado_por_id: Mapped[int | None] = mapped_column(
         ForeignKey("usuarios.id"),
         nullable=True,
@@ -147,6 +149,50 @@ class ControlUsuario(Base):
         default=ahora_utc,
         onupdate=ahora_utc,
         nullable=False,
+    )
+
+
+class RecuperacionContrasena(Base):
+    __tablename__ = "recuperaciones_contrasena"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    usuario_id: Mapped[int | None] = mapped_column(
+        ForeignKey("usuarios.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    destino_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    codigo_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    intentos_fallidos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    expira_en: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    usado_en: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    creado_en: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=ahora_utc,
+        nullable=False,
+        index=True,
+    )
+
+
+class VerificacionCorreo(Base):
+    __tablename__ = "verificaciones_correo"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    usuario_id: Mapped[int | None] = mapped_column(
+        ForeignKey("usuarios.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    destino_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    codigo_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    intentos_fallidos: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    expira_en: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    usado_en: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    creado_en: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=ahora_utc,
+        nullable=False,
+        index=True,
     )
 
 

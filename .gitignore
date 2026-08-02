@@ -20,3 +20,4 @@ tmp/
 CLAUDE.md
 AGENTS.md
 .DS_Store
+.analysis-tools/

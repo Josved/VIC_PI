@@ -42,8 +42,8 @@ export function PantallaRegistro({ navigation }) {
       setErrorFormulario('Escribe tu correo.');
       return;
     }
-    if (formulario.contrasena.length < 6 || formulario.contrasena.length > 72) {
-      setErrorFormulario('La contraseña debe tener entre 6 y 72 caracteres.');
+    if (formulario.contrasena.length < 8 || formulario.contrasena.length > 72) {
+      setErrorFormulario('La contraseña debe tener entre 8 y 72 caracteres.');
       return;
     }
 
@@ -55,6 +55,9 @@ export function PantallaRegistro({ navigation }) {
         apellidos: formulario.apellidos,
         correo: formulario.correo,
         contrasena: formulario.contrasena,
+      });
+      navigation.replace('VerificarCorreo', {
+        correo: formulario.correo.trim().toLowerCase(),
       });
     } catch (error) {
       setErrorFormulario(obtenerMensajeErrorApi(error, 'No se pudo crear la cuenta.'));
