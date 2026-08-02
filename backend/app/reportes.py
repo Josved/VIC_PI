@@ -29,7 +29,6 @@ def crear_reporte(
         usuario_id=usuario_actual.id,
         motivo=datos.motivo,
         comentario=datos.comentario,
-        evidencia_url=datos.evidencia_url,
     )
     base_datos.add(reporte)
     base_datos.commit()
@@ -73,7 +72,16 @@ def actualizar_estado_reporte(
             detail="Reporte no encontrado",
         )
 
+    respuesta = datos.respuesta.strip() if datos.respuesta else None
+    if datos.estado == "resuelto" and not (respuesta or reporte.respuesta):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Escribe una respuesta para el ciudadano antes de resolver el reporte",
+        )
+
     reporte.estado = datos.estado
+    if respuesta:
+        reporte.respuesta = respuesta
     base_datos.commit()
     base_datos.refresh(reporte)
     return reporte

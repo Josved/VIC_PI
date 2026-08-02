@@ -1,9 +1,7 @@
-import * as Notifications from 'expo-notifications';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,11 +9,24 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { CalendarDays, Clock3, MapPin, RefreshCw, Route } from 'lucide-react-native';
+import {
+  CalendarDays,
+  ChevronDown,
+  ChevronUp,
+  Clock3,
+  MapPin,
+  MapPinned,
+  RefreshCw,
+  Route,
+} from 'lucide-react-native';
 
 import { conexionApi, obtenerMensajeErrorApi } from '../componentes/conexionApi';
 import { MapaRuta } from '../componentes/MapaRuta';
 import { PantallaBase } from '../componentes/PantallaBase';
+import {
+  mostrarNotificacionLocal,
+  prepararNotificacionesLocales,
+} from '../componentes/servicioNotificaciones';
 import { colores, espaciado } from '../componentes/tema';
 
 const avisos = [
@@ -51,37 +62,16 @@ const etiquetasOperacion = {
   cancelada: 'Ruta cancelada',
 };
 
-if (Platform.OS !== 'web') {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: false,
-      shouldSetBadge: false,
-    }),
-  });
-}
-
 export function PantallaInicio() {
   const [rutas, cambiarRutas] = useState([]);
   const [cargando, cambiarCargando] = useState(true);
   const [error, cambiarError] = useState('');
   const [diaSeleccionado, cambiarDiaSeleccionado] = useState(null);
+  const [rutaSeleccionadaId, cambiarRutaSeleccionadaId] = useState(null);
   const estadosAnteriores = useRef(null);
 
   useEffect(() => {
-    if (Platform.OS === 'web') return;
-    Notifications.getPermissionsAsync()
-      .then((permiso) =>
-        permiso.granted ? permiso : Notifications.requestPermissionsAsync(),
-      )
-      .catch(() => null);
-    if (Platform.OS === 'android') {
-      Notifications.setNotificationChannelAsync('default', {
-        name: 'Avisos de recolección',
-        importance: Notifications.AndroidImportance.DEFAULT,
-      }).catch(() => null);
-    }
+    prepararNotificacionesLocales().catch(() => null);
   }, []);
 
   const cargarRutas = useCallback(async () => {
@@ -122,12 +112,9 @@ export function PantallaInicio() {
           && anterior !== 'en_recorrido'
           && ruta.operacion?.estado === 'en_recorrido'
         ) {
-          Notifications.scheduleNotificationAsync({
-            content: {
-              title: 'El recolector inició su recorrido',
-              body: `${ruta.nombre}: paso aproximado ${ruta.hora_aproximada}.`,
-            },
-            trigger: null,
+          mostrarNotificacionLocal({
+            titulo: 'El recolector inició su recorrido',
+            cuerpo: `${ruta.nombre}: paso aproximado ${ruta.hora_aproximada}.`,
           }).catch(() => null);
         }
       });
@@ -143,8 +130,14 @@ export function PantallaInicio() {
     (ruta) => ruta.operacion?.estado === 'en_recorrido',
   );
 
-  function abrirDetalle(dia) {
+  function abrirDetalle(dia, rutaId = null) {
     cambiarDiaSeleccionado(dia);
+    cambiarRutaSeleccionadaId(rutaId);
+  }
+
+  function cerrarDetalle() {
+    cambiarDiaSeleccionado(null);
+    cambiarRutaSeleccionadaId(null);
   }
 
   return (
@@ -161,7 +154,7 @@ export function PantallaInicio() {
           key={`aviso-${ruta.id}`}
           onPress={() => {
             const dia = calendario.find((item) => item.id === ruta.dia_semana);
-            if (dia) abrirDetalle(dia);
+            if (dia) abrirDetalle(dia, ruta.id);
           }}
           style={estilos.avisoActivo}
         >
@@ -276,7 +269,7 @@ export function PantallaInicio() {
         animationType="slide"
         transparent
         visible={Boolean(diaSeleccionado)}
-        onRequestClose={() => cambiarDiaSeleccionado(null)}
+        onRequestClose={cerrarDetalle}
       >
         <View style={estilos.fondoModal}>
           <View style={estilos.modal}>
@@ -293,8 +286,21 @@ export function PantallaInicio() {
                   style={estilos.listaModal}
                   contentContainerStyle={estilos.listaModalContenido}
                 >
-                  {diaSeleccionado.rutas.map((ruta) => (
-                    <View key={ruta.id} style={estilos.rutaModal}>
+                  {diaSeleccionado.rutas.map((ruta) => {
+                    const mapaVisible = rutaSeleccionadaId === ruta.id;
+                    const puntosRuta = (ruta.puntos_ruta || []).map((punto) => {
+                      const contenedor = ruta.contenedores.find(
+                        (item) => item.id === punto.contenedor_id,
+                      );
+                      return {
+                        ...punto,
+                        codigo_qr: contenedor?.codigo_qr,
+                        direccion: punto.direccion || contenedor?.direccion,
+                        estado: 'pendiente',
+                      };
+                    });
+                    return (
+                      <View key={ruta.id} style={estilos.rutaModal}>
                       <Text style={estilos.nombreRuta}>{ruta.nombre}</Text>
                       <View style={estilos.datoRuta}>
                         <Clock3 color={colores.primary} size={18} />
@@ -347,29 +353,73 @@ export function PantallaInicio() {
                           ) : null}
                         </View>
                       ) : null}
-                      {ruta.operacion?.estado === 'en_recorrido' ? (
-                        <MapaRuta
-                          paradas={ruta.contenedores.map((contenedor) => ({
-                            ...contenedor,
-                            estado: 'pendiente',
-                          }))}
-                          geometria={ruta.geometria}
-                          ubicacionRecolector={
-                            ruta.operacion.latitud_actual != null
-                              && ruta.operacion.longitud_actual != null
-                              ? {
-                                  latitude: ruta.operacion.latitud_actual,
-                                  longitude: ruta.operacion.longitud_actual,
-                                }
-                              : null
-                          }
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`${
+                          mapaVisible ? 'Ocultar' : 'Ver'
+                        } recorrido de ${ruta.nombre}`}
+                        onPress={() =>
+                          cambiarRutaSeleccionadaId((actual) =>
+                            actual === ruta.id ? null : ruta.id,
+                          )
+                        }
+                        style={[
+                          estilos.botonMapa,
+                          mapaVisible && estilos.botonMapaActivo,
+                        ]}
+                      >
+                        <MapPinned
+                          color={mapaVisible ? colores.white : colores.primary}
+                          size={19}
                         />
+                        <Text
+                          style={[
+                            estilos.textoBotonMapa,
+                            mapaVisible && estilos.textoBotonMapaActivo,
+                          ]}
+                        >
+                          {mapaVisible ? 'Ocultar mapa' : 'Ver recorrido en el mapa'}
+                        </Text>
+                        {mapaVisible ? (
+                          <ChevronUp color={colores.white} size={18} />
+                        ) : (
+                          <ChevronDown color={colores.primary} size={18} />
+                        )}
+                      </Pressable>
+                      {mapaVisible ? (
+                        <View style={estilos.detalleMapa}>
+                          <Text style={estilos.tituloMapa}>Mapa del recorrido</Text>
+                          <Text style={estilos.ayudaMapa}>
+                            La línea verde sigue las calles planeadas y los
+                            contenedores aparecen numerados.
+                          </Text>
+                          <MapaRuta
+                            paradas={ruta.contenedores.map((contenedor) => ({
+                              ...contenedor,
+                              estado: 'pendiente',
+                            }))}
+                            puntos={puntosRuta}
+                            geometria={ruta.geometria}
+                            ubicacionRecolector={
+                              ruta.operacion?.estado === 'en_recorrido'
+                                && ruta.operacion.latitud_actual != null
+                                && ruta.operacion.longitud_actual != null
+                                ? {
+                                    latitude: ruta.operacion.latitud_actual,
+                                    longitude: ruta.operacion.longitud_actual,
+                                  }
+                                : null
+                            }
+                            alto={240}
+                          />
+                        </View>
                       ) : null}
                       {ruta.descripcion ? (
                         <Text style={estilos.descripcionRuta}>{ruta.descripcion}</Text>
                       ) : null}
-                    </View>
-                  ))}
+                      </View>
+                    );
+                  })}
                 </ScrollView>
 
                 {diaSeleccionado.rutas.length > 0 ? (
@@ -382,7 +432,7 @@ export function PantallaInicio() {
                 <Pressable
                   accessibilityRole="button"
                   style={estilos.botonCerrar}
-                  onPress={() => cambiarDiaSeleccionado(null)}
+                  onPress={cerrarDetalle}
                 >
                   <Text style={estilos.textoBotonCerrar}>Cerrar</Text>
                 </Pressable>
@@ -549,6 +599,23 @@ const estilos = StyleSheet.create({
   },
   textoEstadoOperacion: { color: '#1769AA', fontSize: 13, fontWeight: '900' },
   progresoOperacion: { color: '#1769AA', fontSize: 11, fontWeight: '700' },
+  botonMapa: {
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: espaciado.sm,
+    paddingHorizontal: espaciado.md,
+    borderWidth: 1,
+    borderColor: colores.primary,
+    borderRadius: 12,
+    backgroundColor: colores.white,
+  },
+  botonMapaActivo: { backgroundColor: colores.primary },
+  textoBotonMapa: { flex: 1, color: colores.primary, fontSize: 13, fontWeight: '900' },
+  textoBotonMapaActivo: { color: colores.white },
+  detalleMapa: { gap: espaciado.sm, marginTop: espaciado.xs },
+  tituloMapa: { color: colores.text, fontSize: 15, fontWeight: '900' },
+  ayudaMapa: { color: colores.muted, fontSize: 12, lineHeight: 17 },
   descripcionRuta: { color: colores.muted, fontSize: 13, lineHeight: 18 },
   notaModal: {
     marginTop: espaciado.lg,

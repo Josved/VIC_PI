@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -28,6 +28,7 @@ import { usarSesion } from '../componentes/ContextoSesion';
 import { MapaRuta } from '../componentes/MapaRuta';
 import { PanelRecorrido } from '../componentes/PanelRecorrido';
 import { PantallaBase } from '../componentes/PantallaBase';
+import { SelectorHora } from '../componentes/SelectorHora';
 import { colores, espaciado } from '../componentes/tema';
 import { usarContenedores } from '../componentes/usarContenedores';
 
@@ -73,6 +74,8 @@ export function PantallaRutas() {
   const [actualizandoId, cambiarActualizandoId] = useState(null);
   const [error, cambiarError] = useState('');
   const [exito, cambiarExito] = useState('');
+  const referenciaScroll = useRef(null);
+  const posicionEditor = useRef(0);
 
   const contenedorIds = useMemo(
     () =>
@@ -260,6 +263,12 @@ export function PantallaRutas() {
     cambiarRutaEditandoId(ruta.id);
     cambiarError('');
     cambiarExito('');
+    setTimeout(() => {
+      referenciaScroll.current?.scrollTo({
+        y: Math.max(0, posicionEditor.current - 18),
+        animated: true,
+      });
+    }, 50);
   }
 
   async function guardarRuta() {
@@ -332,7 +341,7 @@ export function PantallaRutas() {
   }
 
   return (
-    <PantallaBase centrada={false}>
+    <PantallaBase centrada={false} referenciaScroll={referenciaScroll}>
       <View style={estilos.encabezado}>
         <View style={estilos.iconoEncabezado}>
           <Route color={colores.white} size={28} />
@@ -349,7 +358,12 @@ export function PantallaRutas() {
         <PanelRecorrido rutas={rutas} alActualizarRutas={cargarRutas} />
       ) : null}
 
-      <View style={estilos.tarjeta}>
+      <View
+        onLayout={(evento) => {
+          posicionEditor.current = evento.nativeEvent.layout.y;
+        }}
+        style={[estilos.tarjeta, rutaEditandoId && estilos.tarjetaEditando]}
+      >
         <View style={estilos.filaTitulo}>
           <CalendarClock color={colores.primary} size={23} />
           <Text style={estilos.tituloSeccion}>
@@ -394,12 +408,10 @@ export function PantallaRutas() {
             ))}
           </View>
         </View>
-        <CampoTexto
+        <SelectorHora
           etiqueta="Hora aproximada"
-          value={formulario.hora_aproximada}
-          placeholder="08:30"
-          maxLength={5}
-          onChangeText={(valor) =>
+          valor={formulario.hora_aproximada}
+          alCambiar={(valor) =>
             cambiarFormulario((actual) => ({ ...actual, hora_aproximada: valor }))
           }
         />
@@ -674,6 +686,7 @@ const estilos = StyleSheet.create({
   titulo: { color: colores.text, fontSize: 26, fontWeight: '900' },
   subtitulo: { color: colores.muted, fontSize: 13, lineHeight: 19 },
   tarjeta: { gap: 14, padding: 18, marginBottom: 18, borderWidth: 1, borderColor: colores.border, borderRadius: 20, backgroundColor: colores.white },
+  tarjetaEditando: { borderWidth: 2, borderColor: colores.primary },
   filaTitulo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   tituloSeccion: { color: colores.text, fontSize: 18, fontWeight: '900' },
   campo: { gap: 8 },

@@ -106,7 +106,7 @@ def obtener_recolector_valido(base_datos: Session, recolector_id: int) -> Usuari
     ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="El recolector seleccionado no existe o esta suspendido",
+            detail="El recolector seleccionado no existe o está suspendido",
         )
     return recolector
 
@@ -121,7 +121,7 @@ def obtener_vehiculo_valido(
     if not vehiculo or not vehiculo.activo:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="El vehiculo seleccionado no existe o esta inactivo",
+            detail="El vehículo seleccionado no existe o está inactivo",
         )
     return vehiculo
 

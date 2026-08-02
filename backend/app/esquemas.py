@@ -90,7 +90,7 @@ class RegistroContenedorQREntrada(BaseModel):
     def normalizar_codigo_qr(cls, valor: str) -> str:
         codigo = valor.strip()
         if not codigo:
-            raise ValueError("El codigo QR no puede estar vacio")
+            raise ValueError("El código QR no puede estar vacío")
         return codigo
 
 
@@ -173,7 +173,6 @@ class ReporteCrear(BaseModel):
     contenedor_id: int = Field(gt=0)
     motivo: MotivoReporte
     comentario: str | None = Field(default=None, max_length=500)
-    evidencia_url: str | None = Field(default=None, max_length=300)
 
 
 class ReporteRespuesta(BaseModel):
@@ -183,6 +182,7 @@ class ReporteRespuesta(BaseModel):
     motivo: MotivoReporte
     comentario: str | None
     evidencia_url: str | None
+    respuesta: str | None
     estado: EstadoReporte
     creado_en: datetime
     actualizado_en: datetime
@@ -192,6 +192,7 @@ class ReporteRespuesta(BaseModel):
 
 class ReporteActualizarEstado(BaseModel):
     estado: EstadoReporte
+    respuesta: str | None = Field(default=None, max_length=1000)
 
 
 class CambiarContrasenaEntrada(BaseModel):
@@ -338,7 +339,7 @@ class RutaCrear(BaseModel):
     @classmethod
     def validar_contenedores(cls, valores: list[int]) -> list[int]:
         if any(valor <= 0 for valor in valores):
-            raise ValueError("Los contenedores seleccionados no son validos")
+            raise ValueError("Los contenedores seleccionados no son válidos")
         if len(valores) != len(set(valores)):
             raise ValueError("No se puede repetir un contenedor en la ruta")
         return valores
@@ -380,7 +381,7 @@ class RutaActualizar(BaseModel):
         if valores is None:
             return None
         if any(valor <= 0 for valor in valores):
-            raise ValueError("Los contenedores seleccionados no son validos")
+            raise ValueError("Los contenedores seleccionados no son válidos")
         if len(valores) != len(set(valores)):
             raise ValueError("No se puede repetir un contenedor en la ruta")
         return valores

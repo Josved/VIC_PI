@@ -92,10 +92,12 @@ La evidencia automatizada y las pruebas físicas pendientes están separadas en
 - Los registros públicos siempre crean un perfil `citizen`.
 - Todo usuario autenticado puede registrar o actualizar la ubicación de un
   contenedor por QR y enviar reportes.
-- `collector` y `admin` pueden consultar todos los reportes y cambiar su estado
-  entre pendiente, en revisión y resuelto.
+- `collector` y `admin` pueden consultar todos los reportes, tomarlos y
+  resolverlos con una respuesta obligatoria para el ciudadano.
+- Los ciudadanos solo consultan sus propios reportes, lo que escribieron, su
+  estado y la respuesta del equipo; no pueden atenderlos ni cambiar su estado.
 - La pantalla Reportes permite seleccionar un contenedor por QR o por búsqueda,
-  enviar motivo, comentario y enlace de evidencia, y consultar el seguimiento.
+  enviar motivo y comentario, y consultar el seguimiento.
 
 ## Rutas y calendario semanal
 
@@ -105,7 +107,8 @@ La evidencia automatizada y las pruebas físicas pendientes están separadas en
   contenedores.
 - Los ciudadanos consultan las rutas activas desde Inicio.
 - Los días con recolección aparecen en verde y abren un detalle con horario,
-  zona y cantidad de contenedores.
+  zona, cantidad de contenedores y un mapa desplegable del recorrido sobre
+  calles reales.
 - El administrador asigna cada ruta a un recolector activo.
 - El recolector inicia el recorrido, comparte GPS, atiende u omite paradas,
   registra incidencias y finaliza o cancela el servicio.
@@ -137,8 +140,10 @@ La evidencia automatizada y las pruebas físicas pendientes están separadas en
   temporalmente sin conexión y sincronizar acciones al recuperar la red.
 - El GPS en segundo plano está preparado para una compilación de desarrollo o
   producción; Expo Go mantiene el rastreo únicamente en primer plano.
-- El ciudadano recibe avisos locales, ETA, distancia, placa, avance y ubicación
-  del recorrido.
+- El ciudadano recibe ETA, distancia, placa, avance y ubicación del recorrido.
+- Expo Go muestra los avisos dentro de la aplicación sin cargar el módulo push;
+  las notificaciones del sistema se activan en compilaciones de desarrollo o
+  producción, porque Android dejó de admitir push remoto en Expo Go desde SDK 53.
 
 El backend usa el servicio público de OSRM por defecto. Para operar el motor
 vial completamente dentro de la LAN, consultar

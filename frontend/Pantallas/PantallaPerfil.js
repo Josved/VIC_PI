@@ -67,7 +67,7 @@ export function PantallaPerfil({ navigation }) {
     <PantallaBase>
       <View style={estilos.encabezado}>
         <Text style={estilos.titulo}>Perfil</Text>
-        <Text style={estilos.subtitulo}>{usuario ? `${usuario.nombre} ${usuario.apellidos}` : 'Sesion activa'}</Text>
+        <Text style={estilos.subtitulo}>{usuario ? `${usuario.nombre} ${usuario.apellidos}` : 'Sesión activa'}</Text>
         <Text style={estilos.correo}>{usuario?.correo}</Text>
       </View>
       <View style={estilos.tarjetaRol}>
@@ -113,7 +113,7 @@ export function PantallaPerfil({ navigation }) {
           alPresionar={guardarContrasena}
         />
       </View>
-      <Boton texto="Cerrar sesion" variante="secundario" alPresionar={cerrarSesion} />
+      <Boton texto="Cerrar sesión" variante="secundario" alPresionar={cerrarSesion} />
     </PantallaBase>
   );
 }

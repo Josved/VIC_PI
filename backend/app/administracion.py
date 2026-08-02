@@ -108,7 +108,7 @@ def crear_usuario(
     if base_datos.scalar(select(Usuario).where(Usuario.correo == correo)):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="El correo ya esta registrado",
+            detail="El correo ya está registrado",
         )
 
     usuario = Usuario(
@@ -230,7 +230,7 @@ def crear_vehiculo(
         base_datos.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Ya existe un vehiculo con esa placa",
+            detail="Ya existe un vehículo con esa placa",
         ) from error
     base_datos.refresh(vehiculo)
     return vehiculo
@@ -247,7 +247,7 @@ def actualizar_vehiculo(
     if not vehiculo:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Vehiculo no encontrado",
+            detail="Vehículo no encontrado",
         )
     for campo, valor in datos.model_dump(exclude_unset=True).items():
         setattr(vehiculo, campo, valor)
@@ -258,7 +258,7 @@ def actualizar_vehiculo(
         base_datos.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Ya existe un vehiculo con esa placa",
+            detail="Ya existe un vehículo con esa placa",
         ) from error
     base_datos.refresh(vehiculo)
     return vehiculo

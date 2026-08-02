@@ -76,6 +76,7 @@ class Reporte(Base):
     motivo: Mapped[str] = mapped_column(String(40), nullable=False)
     comentario: Mapped[str | None] = mapped_column(String(500), nullable=True)
     evidencia_url: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    respuesta: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     estado: Mapped[str] = mapped_column(String(20), nullable=False, default="pendiente")
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
     actualizado_en: Mapped[datetime] = mapped_column(
@@ -283,7 +284,7 @@ class IncidenciaOperativa(Base):
 
 
 class DetalleContenedor(Base):
-    """Direccion legible separada para conservar bases de datos existentes."""
+    """Dirección legible separada para conservar bases de datos existentes."""
 
     __tablename__ = "detalles_contenedor"
 

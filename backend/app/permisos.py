@@ -11,7 +11,7 @@ def requiere_rol(*roles_permitidos: str):
         if usuario_actual.rol not in roles_permitidos:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="No tienes permisos para esta accion",
+                detail="No tienes permisos para esta acción",
             )
         return usuario_actual
 

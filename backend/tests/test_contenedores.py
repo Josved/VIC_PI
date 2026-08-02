@@ -388,6 +388,13 @@ class PruebasContenedores(unittest.TestCase):
         self.assertEqual(mis_reportes.status_code, 200, mis_reportes.text)
         self.assertIn(reporte_id, [item["id"] for item in mis_reportes.json()])
 
+        intento_atender_ciudadano = self.cliente.patch(
+            f"/reportes/{reporte_id}/estado",
+            headers=self.encabezados_ciudadano,
+            json={"estado": "en_revision"},
+        )
+        self.assertEqual(intento_atender_ciudadano.status_code, 403)
+
         todos = self.cliente.get("/reportes", headers=self.encabezados)
         self.assertEqual(todos.status_code, 200, todos.text)
         self.assertIn(reporte_id, [item["id"] for item in todos.json()])
@@ -400,13 +407,40 @@ class PruebasContenedores(unittest.TestCase):
         self.assertEqual(tomado.status_code, 200, tomado.text)
         self.assertEqual(tomado.json()["estado"], "en_revision")
 
-        actualizado = self.cliente.patch(
+        resolucion_sin_respuesta = self.cliente.patch(
             f"/reportes/{reporte_id}/estado",
             headers=self.encabezados_admin,
             json={"estado": "resuelto"},
         )
+        self.assertEqual(resolucion_sin_respuesta.status_code, 422)
+
+        actualizado = self.cliente.patch(
+            f"/reportes/{reporte_id}/estado",
+            headers=self.encabezados,
+            json={
+                "estado": "resuelto",
+                "respuesta": "El contenedor fue atendido y ya está disponible.",
+            },
+        )
         self.assertEqual(actualizado.status_code, 200, actualizado.text)
         self.assertEqual(actualizado.json()["estado"], "resuelto")
+        self.assertEqual(
+            actualizado.json()["respuesta"],
+            "El contenedor fue atendido y ya está disponible.",
+        )
+
+        seguimiento_ciudadano = self.cliente.get(
+            "/reportes/mios",
+            headers=self.encabezados_ciudadano,
+        )
+        reporte_actualizado = next(
+            item for item in seguimiento_ciudadano.json() if item["id"] == reporte_id
+        )
+        self.assertEqual(reporte_actualizado["estado"], "resuelto")
+        self.assertEqual(
+            reporte_actualizado["respuesta"],
+            "El contenedor fue atendido y ya está disponible.",
+        )
 
     def test_rutas_semanales_y_permisos(self):
         contenedor = self.cliente.post(

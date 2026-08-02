@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
+import { Trash2 } from 'lucide-react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { colores } from './tema';
 
@@ -65,14 +66,23 @@ export function MapaContenedores({
             title={`Contenedor ${contenedor.codigo_qr}`}
             description={
               contenedor.distancia_m == null
-                ? 'Ubicacion registrada'
+                ? 'Ubicación registrada'
                 : `${Math.round(contenedor.distancia_m)} m de distancia`
             }
-            pinColor={
-              contenedor.id === idSeleccionado ? colores.secondary : colores.primary
-            }
             onPress={() => alSeleccionar(contenedor.id)}
-          />
+          >
+            <View
+              style={[
+                estilos.marcador,
+                contenedor.id === idSeleccionado && estilos.marcadorSeleccionado,
+              ]}
+            >
+              <Trash2 color={colores.white} size={21} strokeWidth={2.5} />
+              <View style={estilos.identificador}>
+                <Text style={estilos.identificadorTexto}>{contenedor.id}</Text>
+              </View>
+            </View>
+          </Marker>
         ))}
       </MapView>
     </View>
@@ -87,4 +97,30 @@ const estilos = StyleSheet.create({
     borderWidth: 1,
     borderColor: colores.border,
   },
+  marcador: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colores.white,
+    borderRadius: 12,
+    backgroundColor: colores.primary,
+  },
+  marcadorSeleccionado: { backgroundColor: colores.secondary },
+  identificador: {
+    position: 'absolute',
+    top: -7,
+    right: -7,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: colores.white,
+    borderRadius: 10,
+    backgroundColor: colores.text,
+  },
+  identificadorTexto: { color: colores.white, fontSize: 9, fontWeight: '900' },
 });
