@@ -38,8 +38,8 @@ La integración conserva los cambios de `main` y de `josved-seguridad-recuperaci
 
 ## Pendientes reales
 
-- Configurar HTTPS y dominio al publicar en servidor.
-- Crear una development build y configurar FCM para push remoto Android.
+- Publicar la Web y la API en el proveedor gratuito elegido.
+- El push remoto Android queda fuera del alcance: la presentación móvil usará Expo Go.
 - Evaluar migración de SQLite a PostgreSQL cuando haya varios usuarios concurrentes en producción.
 - Actualizar Expo en una tarea independiente; `npm audit` reporta avisos moderados en dependencias internas de las herramientas Expo y la corrección automática propone cambios incompatibles.
 - Sustituir OSRM/Nominatim públicos por servicios locales si la LAN debe funcionar sin internet.

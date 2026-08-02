@@ -165,9 +165,9 @@ permisos de los contenedores.
 
 ## Límites deliberados de esta etapa
 
-- La aplicación nativa se compila con Expo/EAS; no se ejecuta dentro de un
-  contenedor.
+- La aplicación móvil se abre con Expo Go y Metro; no se compila un APK ni se
+  ejecuta dentro de un contenedor.
 - Nominatim continúa siendo externo, aunque `VIC_GEOCODING_URL` permite apuntar
   a una futura instancia propia.
-- TLS, balanceo, firewall, monitoreo y separación público/privado pertenecen a
-  la siguiente etapa y no se simulan en este despliegue LAN.
+- TLS, balanceo, firewall, monitoreo y separación público/privado se encuentran
+  implementados en las VM descritas en `docs/SERVIDORES_VIRTUALBOX.md`.

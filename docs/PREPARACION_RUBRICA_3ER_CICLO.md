@@ -47,7 +47,7 @@ presentará.
 | Datos móviles reflejados en web | Base funcional | Demostración sincronizada y evidencia grabada |
 | Web, API y BD alojados en nube | Pendiente | Proveedor, arquitectura y comprobaciones |
 | Aplicación móvil y API 100 % funcionales | En validación continua | Lista de aceptación sin pendientes críticos |
-| Teléfono funcional entregado a evaluadores | Pendiente de presentación | APK instalada, sesión preparada y plan alterno |
+| Teléfono funcional entregado a evaluadores | Pendiente de presentación | Expo Go instalado, QR disponible, sesión preparada y plan alterno |
 
 ## Orden recomendado para mañana
 
@@ -84,7 +84,7 @@ presentará.
 ## Riesgo técnico registrado
 
 `expo-doctor` aprueba las 18 comprobaciones del proyecto. Al 2 de agosto,
-`npm audit` reporta 15 avisos moderados transitivos del ecosistema Expo/React
+`npm audit` reporta 12 avisos moderados transitivos del ecosistema Expo/React
 Native, sin avisos altos o críticos. La corrección automática propone regresar
 a una versión incompatible de Expo, por lo que no se ejecutó
 `npm audit fix --force`.

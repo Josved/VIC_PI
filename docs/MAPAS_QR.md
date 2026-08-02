@@ -39,7 +39,10 @@ Documentación oficial:
 - [Maps SDK para Android](https://developers.google.com/maps/documentation/android-sdk/get-api-key)
 - [Maps SDK para iOS](https://developers.google.com/maps/documentation/ios-sdk/get-api-key)
 
-## Google Cloud requerido
+## Google Cloud para una compilación propia futura
+
+Esta sección no aplica a la entrega actual con Expo Go. Solo sería necesaria si
+en el futuro se generara una aplicación Android/iOS independiente.
 
 Crear un proyecto de Google Cloud con facturación habilitada y activar:
 
@@ -95,15 +98,13 @@ Expo Go incluye los módulos necesarios para probar el mapa, ubicación y cámar
 El teléfono y el servidor deben estar en la misma red. El firewall debe permitir
 el puerto de la API.
 
-`VIC_ALLOW_INSECURE_HTTP=true` permite que los builds internos Android/iOS se
-conecten a una API HTTP dentro de la LAN. El perfil `production` lo fuerza a
-`false`; una versión de producción debe usar HTTPS.
+`VIC_ALLOW_INSECURE_HTTP=true` identifica la configuración de laboratorio. La
+URL HTTP solo debe utilizarse en una red privada; la Web publicada usa HTTPS.
 
-## Builds instalables
+## Builds instalables (fuera del alcance actual)
 
-El perfil `preview` de `frontend/eas.json` genera builds internos. Para Android
-produce una APK instalable. Para iOS requiere una cuenta Apple Developer y
-registrar los dispositivos autorizados.
+El proyecto conserva un archivo `frontend/eas.json` como referencia histórica,
+pero no se ejecutará EAS ni se generará una APK para esta presentación.
 
 Configurar en el entorno `preview` de EAS:
 
