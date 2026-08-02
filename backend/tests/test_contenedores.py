@@ -334,6 +334,16 @@ class PruebasContenedores(unittest.TestCase):
         )
         self.assertEqual(respuesta.status_code, 401)
 
+    def test_metricas_prometheus_de_la_api(self):
+        salud = self.cliente.get("/salud")
+        self.assertEqual(salud.status_code, 200, salud.text)
+
+        metricas = self.cliente.get("/metricas")
+        self.assertEqual(metricas.status_code, 200, metricas.text)
+        self.assertIn("text/plain", metricas.headers["content-type"])
+        self.assertIn("vic_solicitudes_http_total", metricas.text)
+        self.assertIn("vic_duracion_solicitudes_http_segundos", metricas.text)
+
     def test_registro_publico_no_permite_elegir_rol(self):
         respuesta = self.cliente.post(
             "/autenticacion/registro",

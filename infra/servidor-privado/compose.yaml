@@ -1,0 +1,108 @@
+name: vic-privado
+
+x-backend: &backend
+  build:
+    context: ../../backend
+  image: vic-backend-privado:latest
+  init: true
+  restart: unless-stopped
+  environment: &backend-environment
+    VIC_APP_NAME: VIC API
+    VIC_ENVIRONMENT: production
+    VIC_DATABASE_URL: sqlite:////data/vic.db
+    VIC_JWT_SECRET: ${VIC_JWT_SECRET:?Configura VIC_JWT_SECRET en .env}
+    VIC_JWT_ALGORITHM: HS256
+    VIC_TOKEN_EXPIRATION_MINUTES: ${VIC_TOKEN_EXPIRATION_MINUTES:-60}
+    VIC_CORS_ORIGINS: ${VIC_CORS_ORIGINS:-https://localhost:8443}
+    VIC_SMTP_HOST: ${VIC_SMTP_HOST:-}
+    VIC_SMTP_PORT: ${VIC_SMTP_PORT:-587}
+    VIC_SMTP_USERNAME: ${VIC_SMTP_USERNAME:-}
+    VIC_SMTP_PASSWORD: ${VIC_SMTP_PASSWORD:-}
+    VIC_SMTP_FROM_EMAIL: ${VIC_SMTP_FROM_EMAIL:-}
+    VIC_SMTP_FROM_NAME: ${VIC_SMTP_FROM_NAME:-VIC}
+    VIC_SMTP_USE_STARTTLS: ${VIC_SMTP_USE_STARTTLS:-true}
+    VIC_SMTP_USE_SSL: ${VIC_SMTP_USE_SSL:-false}
+    VIC_ROOT_PATH: /api
+    VIC_EVIDENCE_DIR: /data/evidencias
+    VIC_EVIDENCE_PUBLIC_URL: /evidencias
+  volumes:
+    - vic_data:/data
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+  healthcheck:
+    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/salud', timeout=3)"]
+    interval: 30s
+    timeout: 5s
+    start_period: 15s
+    retries: 3
+
+services:
+  backend-a:
+    <<: *backend
+    ports:
+      - "8001:8000"
+
+  backend-b:
+    <<: *backend
+    ports:
+      - "8002:8000"
+
+  prometheus:
+    image: prom/prometheus:v3.7.3
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:12.3.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-vicadmin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Configura GRAFANA_ADMIN_PASSWORD en .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: ${VIC_PUBLIC_URL:-https://localhost:8443}/grafana/
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+  node-exporter:
+    image: prom/node-exporter:v1.10.2
+    restart: unless-stopped
+    command:
+      - --path.rootfs=/host
+    volumes:
+      - /:/host:ro,rslave
+    pid: host
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.55.1
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+
+volumes:
+  vic_data:
+  prometheus_data:
+  grafana_data:

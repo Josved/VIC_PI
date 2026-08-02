@@ -1,8 +1,10 @@
 from pathlib import Path
+from time import perf_counter
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from sqlalchemy import text
 
 from . import modelos
@@ -39,6 +41,35 @@ aplicacion.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
+solicitudes_http = Counter(
+    "vic_solicitudes_http_total",
+    "Cantidad de solicitudes HTTP procesadas por la API VIC.",
+    ["metodo", "ruta", "estado"],
+)
+duracion_solicitudes_http = Histogram(
+    "vic_duracion_solicitudes_http_segundos",
+    "Duracion de las solicitudes HTTP procesadas por la API VIC.",
+    ["metodo", "ruta"],
+)
+
+
+@aplicacion.middleware("http")
+async def registrar_metricas_http(solicitud: Request, siguiente_manejador):
+    inicio = perf_counter()
+    estado = 500
+    try:
+        respuesta = await siguiente_manejador(solicitud)
+        estado = respuesta.status_code
+        return respuesta
+    finally:
+        ruta_registrada = getattr(solicitud.scope.get("route"), "path", solicitud.url.path)
+        if ruta_registrada != "/metricas":
+            metodo = solicitud.method
+            solicitudes_http.labels(metodo, ruta_registrada, str(estado)).inc()
+            duracion_solicitudes_http.labels(metodo, ruta_registrada).observe(
+                perf_counter() - inicio,
+            )
+
 Path(configuracion.directorio_evidencias).mkdir(parents=True, exist_ok=True)
 aplicacion.mount(
     configuracion.url_publica_evidencias,
@@ -66,3 +97,8 @@ def revisar_salud():
     with SesionLocal() as base_datos:
         base_datos.execute(text("SELECT 1"))
     return {"estado": "ok", "base_datos": "ok"}
+
+
+@aplicacion.get("/metricas", include_in_schema=False)
+def consultar_metricas():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)

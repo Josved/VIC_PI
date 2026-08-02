@@ -21,3 +21,6 @@ CLAUDE.md
 AGENTS.md
 .DS_Store
 .analysis-tools/
+infra/**/.env
+infra/**/certificados/*
+!infra/**/certificados/.gitkeep
