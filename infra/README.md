@@ -26,7 +26,8 @@ La aplicación se abre desde la computadora anfitriona en
 - Dos servidores: separación real de entrada pública y servicios privados.
 - Hash y cifrado: bcrypt para contraseñas y hashes HMAC para códigos temporales.
 - Monitoreo: Prometheus, Grafana, Node Exporter y cAdvisor.
-- Firewall: UFW con política de denegación por defecto en ambos servidores.
+- Firewall: UFW con política de denegación por defecto y métricas de estado,
+  reglas y bloqueos exportadas cada 30 segundos.
 - JWT: la API conserva la autenticación y autorización por roles con JWT.
 - SSL: Nginx termina TLS; el laboratorio usa un certificado autofirmado.
 - Balanceador: Nginx distribuye `/api` entre `backend-a` y `backend-b`.
@@ -42,3 +43,6 @@ La aplicación se abre desde la computadora anfitriona en
 
 Nunca se deben subir a Git los archivos `.env`, las contraseñas SMTP ni la
 clave privada del certificado.
+
+La preparación equivalente para AWS, sin crear recursos facturables, se
+encuentra en `infra/aws/README.md`.

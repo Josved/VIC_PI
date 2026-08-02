@@ -1,0 +1,11 @@
+[Unit]
+Description=Actualiza las metricas de UFW cada 30 segundos
+
+[Timer]
+OnBootSec=15s
+OnUnitActiveSec=30s
+AccuracySec=5s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

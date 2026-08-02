@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+test "$(id -u)" -eq 0 || { echo 'Ejecuta este script como root.' >&2; exit 1; }
+ip_privada="${1:?Indica la IP privada del servidor privado}"
+ip_publica="${2:?Indica la IP publica del servidor publico}"
+dns_publico="${3:?Indica el DNS publico del servidor publico}"
 cd /opt/vic/infra/servidor-publico
 
-ip_servidor_privado="${VIC_PRIVATE_SERVER_IP:-10.20.0.20}"
-
-install -m 600 netplan.yaml /etc/netplan/60-vic.yaml
-netplan apply
+sed -i "s/10\.20\.0\.20/${ip_privada}/g" nginx.conf
+bash generar-certificado.sh "$ip_publica" "$dns_publico"
 
 ufw --force reset
 ufw default deny incoming
@@ -14,7 +16,7 @@ ufw default allow outgoing
 ufw allow 22/tcp comment 'SSH administracion'
 ufw allow 80/tcp comment 'HTTP redireccion HTTPS'
 ufw allow 443/tcp comment 'HTTPS VIC'
-ufw allow from "$ip_servidor_privado" to any port 9100 proto tcp comment 'Metricas para Prometheus privado'
+ufw allow from "$ip_privada" to any port 9100 proto tcp comment 'Metricas para Prometheus privado'
 ufw logging low
 ufw --force enable
 

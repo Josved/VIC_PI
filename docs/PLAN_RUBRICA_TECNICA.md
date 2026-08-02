@@ -30,19 +30,19 @@ inicio de sesión de `root` están deshabilitados.
 | --- | --- | --- |
 | Hash y cifrado | Cumple | bcrypt para contraseñas, HMAC para códigos, JWT firmado y TLS para datos en tránsito |
 | Servidor público y privado | Cumple en LAN | Dos VM Ubuntu independientes: `vic-publico` y `vic-privado`, enlazadas por la red interna `vic-privada` |
-| Prometheus y Grafana | Cumple | Prometheus consulta cinco objetivos activos; Grafana carga el panel `VIC - Estado general` |
-| Firewall aplicado y monitoreado | Cumple | UFW activo: público 22/80/443; privado limita 8001, 8002 y 3000 a `10.20.0.10` |
+| Prometheus y Grafana | Cumple | Prometheus consulta seis objetivos; Grafana carga el panel `VIC - Estado general` |
+| Firewall aplicado y monitoreado | Cumple | UFW activo y con registros; Node Exporter publica estado, política, reglas y bloqueos de los dos servidores en Grafana |
 | Protección JWT de la API | Cumple | `/api/contenedores` devuelve 401 sin token; existen autorización por rol y revocación por versión de sesión |
-| Certificado SSL/TLS | Cumple en LAN | Nginx usa TLS 1.2/1.3 y certificado autofirmado con vigencia de un año; en nube se sustituirá por Let's Encrypt |
+| Certificado SSL/TLS | Cumple para la simulación | Nginx usa TLS 1.2/1.3 y el certificado autofirmado acordado para el laboratorio |
 | Balanceador de carga | Cumple | Nginx usa `least_conn` y distribuye solicitudes entre `backend-a` y `backend-b` |
 | Aplicación móvil útil | Cumple | QR, GPS, mapas, ruta del recolector, calendario y reportes |
 | Diseño móvil profesional | Cumple con revisión final pendiente | Navegación y pantallas separadas por perfil |
 | Navegación móvil clara | Cumple | Pestañas por función y restricciones por rol |
 | Formularios validados | Cumple | Validación en interfaz y esquemas Pydantic en la API |
 | Datos móviles visibles en Web | Cumple | Aplicación web y móvil consumen la misma API y base de datos |
-| Web, API y BD en nube | Pendiente | La separación y el despliegue LAN están listos; todavía falta contratar/configurar el proveedor público |
-| Aplicación móvil 100 % funcional | En preparación | Funciones principales listas; push remoto requiere development build y FCM |
-| Teléfono para evaluadores | Pendiente de presentación | Falta instalar la compilación final y preparar una cuenta por perfil |
+| Web, API y BD en nube | Simulación lista; despliegue real pendiente | CloudFormation reproduce dos EC2, VPC, Security Groups, discos cifrados y arranque automático; no se ejecutó para evitar consumo |
+| Aplicación móvil 100 % funcional | Preparada; prueba física aplazada | Funciones listas, `expo-dev-client` instalado y perfiles APK configurados; EAS/FCM requieren las cuentas y el teléfono |
+| Teléfono para evaluadores | Aplazado por decisión del equipo | Se realizará en la fase práctica |
 
 ## Validación ejecutada
 
@@ -53,7 +53,8 @@ inicio de sesión de `root` están deshabilitados.
 | `GET /api/contenedores` sin JWT | Acceso rechazado | 401 |
 | `GET /api/metricas` desde el público | Métricas no expuestas | 404 |
 | `GET /grafana/` | Redirección al acceso de Grafana | 301 |
-| Prometheus | Todos los objetivos disponibles | 5 de 5 en estado `up` |
+| Prometheus | Todos los objetivos disponibles | 6 de 6 en estado `up` después de desplegar el exporter público |
+| Monitoreo UFW | Ambos firewalls visibles | Estado, política, reglas y bloqueos exportados cada 30 segundos |
 | Datos migrados | Información de demostración en el privado | 4 usuarios, 6 contenedores, 5 rutas y 3 reportes |
 
 La base de datos anterior al reemplazo quedó respaldada dentro del servidor
@@ -69,5 +70,7 @@ privado en `/opt/vic/backups/vic-antes-migracion.db`.
 6. Grafana mostrando disponibilidad, solicitudes, latencia, CPU y contenedores.
 7. Un cambio hecho desde el teléfono reflejado inmediatamente en la web.
 
-El alojamiento en nube debe permanecer como pendiente hasta desplegarlo y
-verificarlo en un proveedor externo.
+La plantilla AWS está validada localmente con `cfn-lint`, pero el alojamiento en
+nube debe permanecer como pendiente hasta desplegarlo y verificarlo en una
+cuenta gratuita o educativa. No se debe crear una pila sin revisar primero los
+créditos y las alertas de costo.

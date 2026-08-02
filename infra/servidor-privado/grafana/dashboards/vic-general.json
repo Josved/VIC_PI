@@ -36,6 +36,38 @@
       "targets": [{"expr": "1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))", "legendFormat": "CPU", "refId": "A"}],
       "title": "Uso de CPU del servidor privado",
       "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {"options": {"0": {"color": "red", "text": "INACTIVO"}, "1": {"color": "green", "text": "ACTIVO"}}, "type": "value"}
+          ],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}
+        }
+      },
+      "gridPos": {"h": 7, "w": 8, "x": 0, "y": 16},
+      "id": 5,
+      "targets": [{"expr": "vic_firewall_activo", "legendFormat": "{{servidor}}", "refId": "A"}],
+      "title": "Estado de los firewalls UFW",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 7, "w": 8, "x": 8, "y": 16},
+      "id": 6,
+      "targets": [{"expr": "vic_firewall_bloqueos_ventana", "legendFormat": "{{servidor}}", "refId": "A"}],
+      "title": "Bloqueos UFW (últimos 5 minutos)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 7, "w": 8, "x": 16, "y": 16},
+      "id": 7,
+      "targets": [{"expr": "vic_firewall_reglas_activas", "legendFormat": "{{servidor}}", "refId": "A"}],
+      "title": "Reglas activas de UFW",
+      "type": "stat"
     }
   ],
   "refresh": "15s",
@@ -46,5 +78,5 @@
   "timezone": "browser",
   "title": "VIC - Estado general",
   "uid": "vic-general",
-  "version": 1
+  "version": 2
 }

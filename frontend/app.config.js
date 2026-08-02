@@ -3,11 +3,20 @@ const claveAndroid =
 const claveIos =
   process.env.GOOGLE_MAPS_IOS_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
 const permitirHttpLan = process.env.VIC_ALLOW_INSECURE_HTTP === 'true';
+const easProjectId = process.env.EAS_PROJECT_ID;
+const expoOwner = process.env.EXPO_OWNER;
+const googleServicesFile = process.env.GOOGLE_SERVICES_JSON;
 
 module.exports = ({ config }) => ({
   ...config,
+  ...(expoOwner ? { owner: expoOwner } : {}),
+  extra: {
+    ...config.extra,
+    ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),
+  },
   android: {
     ...config.android,
+    ...(googleServicesFile ? { googleServicesFile } : {}),
     ...(claveAndroid
       ? {
           config: {
@@ -41,6 +50,7 @@ module.exports = ({ config }) => ({
       : {}),
   },
   plugins: [
+    'expo-dev-client',
     'expo-secure-store',
     '@react-native-community/datetimepicker',
     [

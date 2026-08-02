@@ -3,15 +3,32 @@
     "version": ">= 19.1.0"
   },
   "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "environment": "preview",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "VIC_ALLOW_INSECURE_HTTP": "true"
+      }
+    },
     "preview": {
       "distribution": "internal",
       "environment": "preview",
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
         "VIC_ALLOW_INSECURE_HTTP": "true"
       }
     },
     "production": {
       "environment": "production",
+      "android": {
+        "buildType": "app-bundle"
+      },
       "env": {
         "VIC_ALLOW_INSECURE_HTTP": "false"
       }

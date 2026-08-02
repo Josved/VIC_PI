@@ -1,0 +1,14 @@
+[Unit]
+Description=Exporta metricas de UFW para Node Exporter
+After=ufw.service systemd-journald.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/vic-exportar-metricas-ufw
+User=root
+Group=root
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/node_exporter/textfile_collector

@@ -1,0 +1,237 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Laboratorio VIC con dos servidores EC2. Esta plantilla crea recursos que
+  consumen creditos de AWS; validarla localmente no crea ningun recurso.
+
+Parameters:
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Llave EC2 existente para el acceso SSH.
+  AdminCidr:
+    Type: String
+    Default: 0.0.0.0/32
+    AllowedPattern: '^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$'
+    Description: IP publica del administrador en formato x.x.x.x/32.
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues: [t3.micro, t2.micro]
+    Description: Verificar elegibilidad y creditos antes de crear la pila.
+  LatestUbuntuAmi:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+
+Resources:
+  VicVpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.30.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - {Key: Name, Value: vic-simulacion}
+        - {Key: Proyecto, Value: VIC}
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - {Key: Name, Value: vic-igw}
+
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VicVpc
+
+  SubnetLaboratorio:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VicVpc
+      CidrBlock: 10.30.1.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+        - {Key: Name, Value: vic-laboratorio}
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VicVpc
+      Tags:
+        - {Key: Name, Value: vic-rutas}
+
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref SubnetLaboratorio
+
+  PublicSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Entrada HTTPS al servidor publico VIC
+      VpcId: !Ref VicVpc
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: !Ref AdminCidr, Description: SSH administrador}
+        - {IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0, Description: HTTP}
+        - {IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0, Description: HTTPS}
+      SecurityGroupEgress:
+        - {IpProtocol: '-1', CidrIp: 0.0.0.0/0}
+      Tags:
+        - {Key: Name, Value: vic-publico-sg}
+
+  PrivateSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Servicios internos VIC accesibles solo desde el publico
+      VpcId: !Ref VicVpc
+      SecurityGroupEgress:
+        - {IpProtocol: '-1', CidrIp: 0.0.0.0/0}
+      Tags:
+        - {Key: Name, Value: vic-privado-sg}
+
+  PrivateSshIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref PrivateSecurityGroup
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      SourceSecurityGroupId: !Ref PublicSecurityGroup
+      Description: SSH solo por el bastion publico
+
+  PrivateApiAIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref PrivateSecurityGroup
+      IpProtocol: tcp
+      FromPort: 8001
+      ToPort: 8001
+      SourceSecurityGroupId: !Ref PublicSecurityGroup
+      Description: API replica A
+
+  PrivateApiBIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref PrivateSecurityGroup
+      IpProtocol: tcp
+      FromPort: 8002
+      ToPort: 8002
+      SourceSecurityGroupId: !Ref PublicSecurityGroup
+      Description: API replica B
+
+  PrivateGrafanaIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref PrivateSecurityGroup
+      IpProtocol: tcp
+      FromPort: 3000
+      ToPort: 3000
+      SourceSecurityGroupId: !Ref PublicSecurityGroup
+      Description: Grafana por Nginx
+
+  PublicMetricsIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref PublicSecurityGroup
+      IpProtocol: tcp
+      FromPort: 9100
+      ToPort: 9100
+      SourceSecurityGroupId: !Ref PrivateSecurityGroup
+      Description: Node Exporter solo para Prometheus privado
+
+  PublicInstance:
+    Type: AWS::EC2::Instance
+    DependsOn: DefaultRoute
+    Properties:
+      ImageId: !Ref LatestUbuntuAmi
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: '0'
+          DeleteOnTermination: true
+          PrivateIpAddress: 10.30.1.10
+          SubnetId: !Ref SubnetLaboratorio
+          GroupSet: [!Ref PublicSecurityGroup]
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 12
+            VolumeType: gp3
+            Encrypted: true
+            DeleteOnTermination: true
+      UserData:
+        Fn::Base64: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y docker.io docker-compose-v2 git ufw openssl curl
+          systemctl enable --now docker
+          git clone --depth 1 https://github.com/Josved/VIC_PI.git /opt/vic
+          TOKEN=$(curl -fsS --max-time 3 -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' http://169.254.169.254/latest/api/token)
+          PUBLIC_IP=$(curl -fsS --max-time 3 -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
+          PUBLIC_DNS=$(curl -fsS --max-time 3 -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/public-hostname)
+          bash /opt/vic/infra/aws/configurar-publico-aws.sh 10.30.1.20 "$PUBLIC_IP" "$PUBLIC_DNS"
+      Tags:
+        - {Key: Name, Value: vic-publico}
+        - {Key: Proyecto, Value: VIC}
+        - {Key: Entorno, Value: simulacion}
+
+  PrivateInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref LatestUbuntuAmi
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: '0'
+          DeleteOnTermination: true
+          PrivateIpAddress: 10.30.1.20
+          SubnetId: !Ref SubnetLaboratorio
+          GroupSet: [!Ref PrivateSecurityGroup]
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 16
+            VolumeType: gp3
+            Encrypted: true
+            DeleteOnTermination: true
+      UserData:
+        Fn::Base64: !Sub |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y docker.io docker-compose-v2 git ufw openssl curl
+          systemctl enable --now docker
+          git clone --depth 1 https://github.com/Josved/VIC_PI.git /opt/vic
+          bash /opt/vic/infra/aws/configurar-privado-aws.sh 10.30.1.10 '${PublicInstance.PublicDnsName}'
+      Tags:
+        - {Key: Name, Value: vic-privado}
+        - {Key: Proyecto, Value: VIC}
+        - {Key: Entorno, Value: simulacion}
+
+Outputs:
+  AplicacionUrl:
+    Description: HTTPS del laboratorio; el certificado es autofirmado.
+    Value: !Sub https://${PublicInstance.PublicDnsName}
+  GrafanaUrl:
+    Description: Grafana a traves del servidor publico.
+    Value: !Sub https://${PublicInstance.PublicDnsName}/grafana/
+  PublicInstanceId:
+    Value: !Ref PublicInstance
+  PrivateInstanceId:
+    Value: !Ref PrivateInstance
+  PrivateServerAddress:
+    Value: 10.30.1.20

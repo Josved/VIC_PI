@@ -1,5 +1,8 @@
 # Preparación para la rúbrica del tercer ciclo
 
+> Documento histórico del 31 de julio. El estado vigente está en
+> `docs/PLAN_RUBRICA_TECNICA.md`.
+
 Fecha de revisión: 2026-07-31
 
 ## Alcance
@@ -80,9 +83,8 @@ presentará.
 
 ## Riesgo técnico registrado
 
-`expo-doctor` aprueba las 18 comprobaciones del proyecto. `npm audit` todavía
-reporta 28 avisos transitivos del ecosistema Expo/React Native: 19 altos, 9
-moderados y ninguno crítico. La corrección automática propuesta exige saltos
-mayores de Expo y React Native, por lo que no se ejecutó `npm audit fix --force`.
-La actualización debe hacerse mañana como una migración controlada, con una
-compilación Android y pruebas físicas después de cada salto.
+`expo-doctor` aprueba las 18 comprobaciones del proyecto. Al 2 de agosto,
+`npm audit` reporta 15 avisos moderados transitivos del ecosistema Expo/React
+Native, sin avisos altos o críticos. La corrección automática propone regresar
+a una versión incompatible de Expo, por lo que no se ejecutó
+`npm audit fix --force`.

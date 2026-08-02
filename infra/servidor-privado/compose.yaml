@@ -86,8 +86,10 @@ services:
     restart: unless-stopped
     command:
       - --path.rootfs=/host
+      - --collector.textfile.directory=/textfile
     volumes:
       - /:/host:ro,rslave
+      - /var/lib/node_exporter/textfile_collector:/textfile:ro
     pid: host
 
   cadvisor:
