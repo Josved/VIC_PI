@@ -343,6 +343,7 @@ class PruebasContenedores(unittest.TestCase):
         self.assertIn("text/plain", metricas.headers["content-type"])
         self.assertIn("vic_solicitudes_http_total", metricas.text)
         self.assertIn("vic_duracion_solicitudes_http_segundos", metricas.text)
+        self.assertIn("vic_base_datos_disponible 1.0", metricas.text)
 
     def test_registro_publico_no_permite_elegir_rol(self):
         respuesta = self.cliente.post(

@@ -1,82 +1,402 @@
 {
-  "annotations": {"list": []},
-  "editable": false,
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {"type": "grafana", "uid": "-- Grafana --"},
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(255, 145, 0, 1)",
+        "name": "Anotaciones y alertas",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Centro de monitoreo de VIC. Diseño adaptado del dashboard Docker monitoring 15798 de Grafana Labs para las métricas reales de VIC.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [
+    {"asDropdown": false, "icon": "doc", "includeVars": false, "keepTime": false, "tags": [], "targetBlank": true, "title": "Modelo visual 15798", "tooltip": "Dashboard Docker monitoring usado como referencia", "type": "link", "url": "https://grafana.com/grafana/dashboards/15798-docker-monitoring/"}
+  ],
   "panels": [
     {
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {"defaults": {"unit": "reqps"}},
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "gridPos": {"h": 3, "w": 24, "x": 0, "y": 0},
       "id": 1,
-      "targets": [{"expr": "sum(rate(vic_solicitudes_http_total[5m]))", "legendFormat": "solicitudes/s", "refId": "A"}],
-      "title": "Solicitudes de la API",
-      "type": "timeseries"
+      "options": {
+        "code": {"language": "plaintext", "showLineNumbers": false, "showMiniMap": false},
+        "content": "# ♻️ VIC — Centro de monitoreo\n**Aplicación, servidores, contenedores y seguridad en una sola vista.**  ·  Actualización automática cada 15 segundos  ·  🟢 Operación normal  ·  🟠 Atención  ·  🔴 Incidencia",
+        "mode": "markdown"
+      },
+      "pluginVersion": "12.3.0",
+      "title": "",
+      "transparent": true,
+      "type": "text"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 3},
+      "id": 10,
+      "panels": [],
+      "title": "RESUMEN OPERATIVO",
+      "type": "row"
     },
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {"defaults": {"unit": "s"}},
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
-      "id": 2,
-      "targets": [{"expr": "histogram_quantile(0.95, sum(rate(vic_duracion_solicitudes_http_segundos_bucket[5m])) by (le))", "legendFormat": "p95", "refId": "A"}],
-      "title": "Latencia p95 de la API",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
-      "id": 3,
-      "targets": [{"expr": "up{job=~\"vic-api-.*\"}", "legendFormat": "{{job}}", "refId": "A"}],
-      "title": "Réplicas de API disponibles",
+      "description": "Cantidad de réplicas FastAPI que Prometheus puede consultar.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "max": 2,
+          "min": 0,
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "orange", "value": 1}, {"color": "green", "value": 2}]},
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 5, "w": 4, "x": 0, "y": 4},
+      "id": 11,
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "percentChangeColorMode": "standard", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showPercentChange": false, "textMode": "auto", "wideLayout": true},
+      "targets": [{"editorMode": "code", "expr": "sum(up{job=~\"vic-api-.*\"})", "legendFormat": "Réplicas", "range": true, "refId": "A"}],
+      "title": "API disponibles",
       "type": "stat"
     },
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {"defaults": {"unit": "percentunit"}},
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
-      "id": 4,
-      "targets": [{"expr": "1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))", "legendFormat": "CPU", "refId": "A"}],
-      "title": "Uso de CPU del servidor privado",
+      "description": "Conectividad real de ambas réplicas con la base de datos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [{"options": {"0": {"color": "red", "text": "SIN CONEXIÓN"}, "1": {"color": "green", "text": "DISPONIBLE"}}, "type": "value"}],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 5, "w": 4, "x": 4, "y": 4},
+      "id": 12,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "targets": [{"editorMode": "code", "expr": "min(vic_base_datos_disponible) or vector(0)", "legendFormat": "Base de datos", "range": true, "refId": "A"}],
+      "title": "Base de datos",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "Solicitudes reales por segundo sin incluir el sondeo automático de salud.",
+      "fieldConfig": {"defaults": {"color": {"fixedColor": "green", "mode": "fixed"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}, "unit": "reqps"}, "overrides": []},
+      "gridPos": {"h": 5, "w": 4, "x": 8, "y": 4},
+      "id": 13,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "targets": [{"editorMode": "code", "expr": "sum(rate(vic_solicitudes_http_total{ruta!=\"/salud\"}[5m])) or vector(0)", "legendFormat": "Solicitudes/s", "range": true, "refId": "A"}],
+      "title": "Tráfico de la aplicación",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "El 95 % de las solicitudes responde por debajo de este tiempo.",
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 500}, {"color": "red", "value": 1000}]}, "unit": "ms"}, "overrides": []},
+      "gridPos": {"h": 5, "w": 4, "x": 12, "y": 4},
+      "id": 14,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "targets": [{"editorMode": "code", "expr": "histogram_quantile(0.95, sum(rate(vic_duracion_solicitudes_http_segundos_bucket{ruta!=\"/salud\"}[5m])) by (le)) * 1000", "legendFormat": "p95", "range": true, "refId": "A"}],
+      "title": "Latencia p95",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "Respuestas HTTP 500 o superiores durante los últimos cinco minutos.",
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 0.001}]}, "unit": "reqps"}, "overrides": []},
+      "gridPos": {"h": 5, "w": 4, "x": 16, "y": 4},
+      "id": 15,
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "targets": [{"editorMode": "code", "expr": "sum(rate(vic_solicitudes_http_total{estado=~\"5..\"}[5m])) or vector(0)", "legendFormat": "Errores/s", "range": true, "refId": "A"}],
+      "title": "Errores del servidor",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "Ambos firewalls deben mantenerse activos.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [{"options": {"0": {"color": "red", "text": "REVISAR"}, "1": {"color": "green", "text": "PROTEGIDO"}}, "type": "value"}],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 5, "w": 4, "x": 20, "y": 4},
+      "id": 16,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "targets": [{"editorMode": "code", "expr": "min(vic_firewall_activo) or vector(0)", "legendFormat": "Firewalls", "range": true, "refId": "A"}],
+      "title": "Seguridad UFW",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 9},
+      "id": 20,
+      "panels": [],
+      "title": "RENDIMIENTO DE LA APLICACIÓN",
+      "type": "row"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 18, "gradientMode": "opacity", "hideFrom": {"legend": false, "tooltip": false, "viz": false}, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 4, "scaleDistribution": {"type": "linear"}, "showPoints": "never", "spanNulls": true, "stacking": {"group": "A", "mode": "none"}, "thresholdsStyle": {"mode": "off"}}, "unit": "reqps"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 10},
+      "id": 21,
+      "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"hideZeros": false, "mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "sum by (ruta) (rate(vic_solicitudes_http_total{ruta!=\"/salud\"}[5m]))", "legendFormat": "{{ruta}}", "range": true, "refId": "A"}],
+      "title": "Solicitudes por función",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "drawStyle": "bars", "fillOpacity": 35, "gradientMode": "none", "hideFrom": {"legend": false, "tooltip": false, "viz": false}, "lineInterpolation": "linear", "lineWidth": 1, "pointSize": 3, "scaleDistribution": {"type": "linear"}, "showPoints": "never", "spanNulls": true, "stacking": {"group": "A", "mode": "normal"}, "thresholdsStyle": {"mode": "off"}}, "unit": "reqps"}, "overrides": [{"matcher": {"id": "byRegexp", "options": "/5../"}, "properties": [{"id": "color", "value": {"fixedColor": "red", "mode": "fixed"}}]}]},
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 10},
+      "id": 22,
+      "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"hideZeros": false, "mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "sum by (estado) (rate(vic_solicitudes_http_total{ruta!=\"/salud\"}[5m]))", "legendFormat": "HTTP {{estado}}", "range": true, "refId": "A"}],
+      "title": "Respuestas HTTP por estado",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 12, "gradientMode": "opacity", "hideFrom": {"legend": false, "tooltip": false, "viz": false}, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 3, "scaleDistribution": {"type": "linear"}, "showPoints": "never", "spanNulls": true, "stacking": {"group": "A", "mode": "none"}, "thresholdsStyle": {"mode": "line"}}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 500}, {"color": "red", "value": 1000}]}, "unit": "ms"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 10},
+      "id": 23,
+      "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"hideZeros": false, "mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "histogram_quantile(0.95, sum by (le, ruta) (rate(vic_duracion_solicitudes_http_segundos_bucket{ruta!=\"/salud\"}[5m]))) * 1000", "legendFormat": "{{ruta}}", "range": true, "refId": "A"}],
+      "title": "Latencia p95 por función",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 18},
+      "id": 30,
+      "panels": [],
+      "title": "SERVIDORES LINUX",
+      "type": "row"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "continuous-GrYlRd"}, "custom": {"axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 25, "gradientMode": "opacity", "hideFrom": {"legend": false, "tooltip": false, "viz": false}, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 3, "scaleDistribution": {"type": "linear"}, "showPoints": "never", "spanNulls": true, "stacking": {"group": "A", "mode": "none"}, "thresholdsStyle": {"mode": "line"}}, "max": 100, "min": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 70}, {"color": "red", "value": 90}]}, "unit": "percent"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 19},
+      "id": 31,
+      "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"hideZeros": false, "mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "100 - (avg by (job) (rate(node_cpu_seconds_total{job=~\"$servidor\", mode=\"idle\"}[5m])) * 100)", "legendFormat": "{{job}}", "range": true, "refId": "A"}],
+      "title": "Uso de CPU",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "continuous-GrYlRd"}, "custom": {"axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 25, "gradientMode": "opacity", "hideFrom": {"legend": false, "tooltip": false, "viz": false}, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 3, "scaleDistribution": {"type": "linear"}, "showPoints": "never", "spanNulls": true, "stacking": {"group": "A", "mode": "none"}, "thresholdsStyle": {"mode": "line"}}, "max": 100, "min": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 75}, {"color": "red", "value": 90}]}, "unit": "percent"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 19},
+      "id": 32,
+      "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"hideZeros": false, "mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "(1 - node_memory_MemAvailable_bytes{job=~\"$servidor\"} / node_memory_MemTotal_bytes{job=~\"$servidor\"}) * 100", "legendFormat": "{{job}}", "range": true, "refId": "A"}],
+      "title": "Uso de memoria RAM",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "continuous-GrYlRd"}, "custom": {"axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 25, "gradientMode": "opacity", "hideFrom": {"legend": false, "tooltip": false, "viz": false}, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 3, "scaleDistribution": {"type": "linear"}, "showPoints": "never", "spanNulls": true, "stacking": {"group": "A", "mode": "none"}, "thresholdsStyle": {"mode": "line"}}, "max": 100, "min": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 75}, {"color": "red", "value": 90}]}, "unit": "percent"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 19},
+      "id": 33,
+      "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"hideZeros": false, "mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "(1 - node_filesystem_avail_bytes{job=~\"$servidor\", mountpoint=\"/\", fstype!~\"tmpfs|overlay|squashfs\"} / node_filesystem_size_bytes{job=~\"$servidor\", mountpoint=\"/\", fstype!~\"tmpfs|overlay|squashfs\"}) * 100", "legendFormat": "{{job}}", "range": true, "refId": "A"}],
+      "title": "Uso del disco raíz",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisCenteredZero": true, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 15, "gradientMode": "opacity", "hideFrom": {"legend": false, "tooltip": false, "viz": false}, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 3, "scaleDistribution": {"type": "linear"}, "showPoints": "never", "spanNulls": true, "stacking": {"group": "A", "mode": "none"}, "thresholdsStyle": {"mode": "off"}}, "unit": "Bps"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 27},
+      "id": 34,
+      "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"hideZeros": false, "mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"editorMode": "code", "expr": "sum by (job) (rate(node_network_receive_bytes_total{job=~\"$servidor\", device!~\"lo|veth.*|docker.*|br-.*\"}[5m]))", "legendFormat": "{{job}} recibido", "range": true, "refId": "A"},
+        {"editorMode": "code", "expr": "-sum by (job) (rate(node_network_transmit_bytes_total{job=~\"$servidor\", device!~\"lo|veth.*|docker.*|br-.*\"}[5m]))", "legendFormat": "{{job}} enviado", "range": true, "refId": "B"}
+      ],
+      "title": "Tráfico de red de los servidores",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 35},
+      "id": 40,
+      "panels": [],
+      "title": "CONTENEDORES DOCKER",
+      "type": "row"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"fixedColor": "green", "mode": "fixed"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 6, "w": 4, "x": 0, "y": 36},
+      "id": 41,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "targets": [{"editorMode": "code", "expr": "count((time() - container_last_seen{job=\"contenedores\", image!=\"\"}) < 30)", "legendFormat": "Activos", "range": true, "refId": "A"}],
+      "title": "Contenedores activos",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 20, "gradientMode": "opacity", "hideFrom": {"legend": false, "tooltip": false, "viz": false}, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 3, "scaleDistribution": {"type": "linear"}, "showPoints": "never", "spanNulls": true, "stacking": {"group": "A", "mode": "none"}, "thresholdsStyle": {"mode": "off"}}, "unit": "bytes"}, "overrides": []},
+      "gridPos": {"h": 6, "w": 10, "x": 4, "y": 36},
+      "id": 42,
+      "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"hideZeros": false, "mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "sum by (name) (container_memory_working_set_bytes{job=\"contenedores\", image!=\"\", name=~\"$contenedor\"} and on (id) ((time() - container_last_seen{job=\"contenedores\", image!=\"\"}) < 30))", "legendFormat": "{{name}}", "range": true, "refId": "A"}],
+      "title": "Memoria por contenedor",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 20, "gradientMode": "opacity", "hideFrom": {"legend": false, "tooltip": false, "viz": false}, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 3, "scaleDistribution": {"type": "linear"}, "showPoints": "never", "spanNulls": true, "stacking": {"group": "A", "mode": "none"}, "thresholdsStyle": {"mode": "off"}}, "unit": "percent"}, "overrides": []},
+      "gridPos": {"h": 6, "w": 10, "x": 14, "y": 36},
+      "id": 43,
+      "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"hideZeros": false, "mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{job=\"contenedores\", image!=\"\", name=~\"$contenedor\"}[5m]) and on (id) ((time() - container_last_seen{job=\"contenedores\", image!=\"\"}) < 30)) * 100", "legendFormat": "{{name}}", "range": true, "refId": "A"}],
+      "title": "CPU por contenedor",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisCenteredZero": true, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 15, "gradientMode": "opacity", "hideFrom": {"legend": false, "tooltip": false, "viz": false}, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 3, "scaleDistribution": {"type": "linear"}, "showPoints": "never", "spanNulls": true, "stacking": {"group": "A", "mode": "none"}, "thresholdsStyle": {"mode": "off"}}, "unit": "Bps"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 42},
+      "id": 44,
+      "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"hideZeros": false, "mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"editorMode": "code", "expr": "sum by (name) (rate(container_network_receive_bytes_total{job=\"contenedores\", image!=\"\", name=~\"$contenedor\"}[5m]) and on (id) ((time() - container_last_seen{job=\"contenedores\", image!=\"\"}) < 30))", "legendFormat": "{{name}} recibido", "range": true, "refId": "A"},
+        {"editorMode": "code", "expr": "-sum by (name) (rate(container_network_transmit_bytes_total{job=\"contenedores\", image!=\"\", name=~\"$contenedor\"}[5m]) and on (id) ((time() - container_last_seen{job=\"contenedores\", image!=\"\"}) < 30))", "legendFormat": "{{name}} enviado", "range": true, "refId": "B"}
+      ],
+      "title": "Red por contenedor",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisCenteredZero": true, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 15, "gradientMode": "opacity", "hideFrom": {"legend": false, "tooltip": false, "viz": false}, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 3, "scaleDistribution": {"type": "linear"}, "showPoints": "never", "spanNulls": true, "stacking": {"group": "A", "mode": "none"}, "thresholdsStyle": {"mode": "off"}}, "unit": "Bps"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 42},
+      "id": 45,
+      "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"hideZeros": false, "mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"editorMode": "code", "expr": "sum by (name) (rate(container_fs_reads_bytes_total{job=\"contenedores\", image!=\"\", name=~\"$contenedor\"}[5m]) and on (id) ((time() - container_last_seen{job=\"contenedores\", image!=\"\"}) < 30))", "legendFormat": "{{name}} lectura", "range": true, "refId": "A"},
+        {"editorMode": "code", "expr": "-sum by (name) (rate(container_fs_writes_bytes_total{job=\"contenedores\", image!=\"\", name=~\"$contenedor\"}[5m]) and on (id) ((time() - container_last_seen{job=\"contenedores\", image!=\"\"}) < 30))", "legendFormat": "{{name}} escritura", "range": true, "refId": "B"}
+      ],
+      "title": "Disco por contenedor",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 50},
+      "id": 50,
+      "panels": [],
+      "title": "DISPONIBILIDAD Y SEGURIDAD",
+      "type": "row"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [{"options": {"0": {"color": "red", "text": "INACTIVO"}, "1": {"color": "green", "text": "ACTIVO"}}, "type": "value"}],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 6, "w": 8, "x": 0, "y": 51},
+      "id": 51,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "targets": [{"editorMode": "code", "expr": "vic_firewall_activo", "legendFormat": "{{servidor}}", "range": true, "refId": "A"}],
+      "title": "Estado de los firewalls",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"fixedColor": "green", "mode": "fixed"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 6, "w": 8, "x": 8, "y": 51},
+      "id": 52,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "targets": [{"editorMode": "code", "expr": "vic_firewall_reglas_activas", "legendFormat": "{{servidor}}", "range": true, "refId": "A"}],
+      "title": "Reglas activas de UFW",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"fixedColor": "orange", "mode": "fixed"}, "custom": {"axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "drawStyle": "bars", "fillOpacity": 35, "gradientMode": "opacity", "hideFrom": {"legend": false, "tooltip": false, "viz": false}, "lineInterpolation": "linear", "lineWidth": 1, "pointSize": 3, "scaleDistribution": {"type": "linear"}, "showPoints": "never", "spanNulls": true, "stacking": {"group": "A", "mode": "none"}, "thresholdsStyle": {"mode": "off"}}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 6, "w": 8, "x": 16, "y": 51},
+      "id": 53,
+      "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"hideZeros": false, "mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "vic_firewall_bloqueos_ventana", "legendFormat": "{{servidor}}", "range": true, "refId": "A"}],
+      "title": "Bloqueos UFW (últimos 5 minutos)",
       "type": "timeseries"
     },
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {
         "defaults": {
-          "mappings": [
-            {"options": {"0": {"color": "red", "text": "INACTIVO"}, "1": {"color": "green", "text": "ACTIVO"}}, "type": "value"}
-          ],
+          "color": {"mode": "thresholds"},
+          "custom": {"fillOpacity": 80, "hideFrom": {"legend": false, "tooltip": false, "viz": false}, "insertNulls": false, "lineWidth": 0, "spanNulls": true},
+          "mappings": [{"options": {"0": {"color": "red", "text": "CAÍDO"}, "1": {"color": "green", "text": "DISPONIBLE"}}, "type": "value"}],
           "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}
-        }
+        },
+        "overrides": []
       },
-      "gridPos": {"h": 7, "w": 8, "x": 0, "y": 16},
-      "id": 5,
-      "targets": [{"expr": "vic_firewall_activo", "legendFormat": "{{servidor}}", "refId": "A"}],
-      "title": "Estado de los firewalls UFW",
-      "type": "stat"
-    },
-    {
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 7, "w": 8, "x": 8, "y": 16},
-      "id": 6,
-      "targets": [{"expr": "vic_firewall_bloqueos_ventana", "legendFormat": "{{servidor}}", "refId": "A"}],
-      "title": "Bloqueos UFW (últimos 5 minutos)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 7, "w": 8, "x": 16, "y": 16},
-      "id": 7,
-      "targets": [{"expr": "vic_firewall_reglas_activas", "legendFormat": "{{servidor}}", "refId": "A"}],
-      "title": "Reglas activas de UFW",
-      "type": "stat"
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 57},
+      "id": 54,
+      "options": {"alignValue": "left", "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "mergeValues": true, "rowHeight": 0.9, "showValue": "never", "tooltip": {"hideZeros": false, "mode": "single", "sort": "none"}},
+      "targets": [
+        {"editorMode": "code", "expr": "up{job=~\"vic-api-.*\"}", "legendFormat": "API {{job}}", "range": true, "refId": "A"},
+        {"editorMode": "code", "expr": "vic_base_datos_disponible", "legendFormat": "Base de datos {{job}}", "range": true, "refId": "B"},
+        {"editorMode": "code", "expr": "up{job=~\"servidor-.*|contenedores|prometheus\"}", "legendFormat": "{{job}}", "range": true, "refId": "C"}
+      ],
+      "title": "Historial de disponibilidad de todos los componentes",
+      "type": "state-timeline"
     }
   ],
+  "preload": false,
   "refresh": "15s",
   "schemaVersion": 41,
-  "tags": ["VIC", "rubrica"],
-  "templating": {"list": []},
+  "tags": ["VIC", "Prometheus", "Docker", "Linux", "seguridad", "rúbrica"],
+  "templating": {
+    "list": [
+      {
+        "allValue": "servidor-.*",
+        "current": {"text": "Todos", "value": "$__all"},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "definition": "label_values(node_uname_info{job=~\"servidor-.*\"}, job)",
+        "includeAll": true,
+        "label": "Servidor",
+        "multi": true,
+        "name": "servidor",
+        "options": [],
+        "query": {"query": "label_values(node_uname_info{job=~\"servidor-.*\"}, job)", "refId": "PrometheusVariableQueryEditor-Servidor"},
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {"text": "Todos", "value": "$__all"},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "definition": "label_values(container_memory_usage_bytes{job=\"contenedores\", image!=\"\"}, name)",
+        "includeAll": true,
+        "label": "Contenedor",
+        "multi": true,
+        "name": "contenedor",
+        "options": [],
+        "query": {"query": "label_values(container_memory_usage_bytes{job=\"contenedores\", image!=\"\"}, name)", "refId": "PrometheusVariableQueryEditor-Contenedor"},
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
   "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {"refresh_intervals": ["5s", "10s", "15s", "30s", "1m", "5m", "15m", "30m", "1h"], "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"]},
   "timezone": "browser",
-  "title": "VIC - Estado general",
+  "title": "VIC - Centro de monitoreo",
   "uid": "vic-general",
-  "version": 2
+  "version": 3,
+  "weekStart": "monday"
 }

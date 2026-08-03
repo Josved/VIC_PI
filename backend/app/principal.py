@@ -4,7 +4,7 @@ from time import perf_counter
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from sqlalchemy import text
 
 from . import modelos
@@ -51,6 +51,10 @@ duracion_solicitudes_http = Histogram(
     "vic_duracion_solicitudes_http_segundos",
     "Duracion de las solicitudes HTTP procesadas por la API VIC.",
     ["metodo", "ruta"],
+)
+base_datos_disponible = Gauge(
+    "vic_base_datos_disponible",
+    "Indica si la API VIC puede consultar su base de datos (1 disponible, 0 no disponible).",
 )
 
 
@@ -103,4 +107,11 @@ def revisar_salud():
 
 @aplicacion.get("/metricas", include_in_schema=False)
 def consultar_metricas():
+    try:
+        with SesionLocal() as base_datos:
+            base_datos.execute(text("SELECT 1"))
+    except Exception:
+        base_datos_disponible.set(0)
+    else:
+        base_datos_disponible.set(1)
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
