@@ -79,6 +79,7 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
   const [comentarioIncidencia, cambiarComentarioIncidencia] = useState('');
   const [evidenciaIncidencia, cambiarEvidenciaIncidencia] = useState('');
   const [evidenciaNombre, cambiarEvidenciaNombre] = useState('');
+  const [evidenciasParadas, cambiarEvidenciasParadas] = useState({});
   const [mensajeOffline, cambiarMensajeOffline] = useState('');
   const [paradaIncidenciaId, cambiarParadaIncidenciaId] = useState(null);
   const [motivoCancelacion, cambiarMotivoCancelacion] = useState('');
@@ -290,6 +291,14 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
   }
 
   async function actualizarParada(parada, estado) {
+    const evidenciaParada = evidenciasParadas[parada.id]?.url || parada.evidencia_url || null;
+    if (estado === 'recolectado' && !evidenciaParada) {
+      Alert.alert(
+        'Fotografía requerida',
+        'Toma una fotografía de evidencia antes de marcar la parada como recolectada.',
+      );
+      return;
+    }
     try {
       cambiarProcesando(true);
       cambiarError('');
@@ -302,12 +311,15 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
             estado === 'omitido'
               ? 'Parada omitida por el recolector; revisar incidencia.'
               : null,
+          evidencia_url: evidenciaParada,
         },
       );
       const datosActualizados = respuesta?.data || {
         ...ejecucion,
         paradas: ejecucion.paradas.map((item) =>
-          item.id === parada.id ? { ...item, estado } : item,
+          item.id === parada.id
+            ? { ...item, estado, evidencia_url: evidenciaParada }
+            : item,
         ),
       };
       const atendidas = datosActualizados.paradas.filter(
@@ -321,12 +333,60 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
         (item) => item.estado === 'pendiente',
       );
       cambiarParadaIncidenciaId(siguiente?.id || null);
+      cambiarEvidenciasParadas((actuales) => {
+        const siguientes = { ...actuales };
+        delete siguientes[parada.id];
+        return siguientes;
+      });
       if (encolada) cambiarMensajeOffline('Parada guardada para sincronizar.');
       else await alActualizarRutas();
     } catch (excepcion) {
       Alert.alert(
         'No se pudo actualizar',
         obtenerMensajeErrorApi(excepcion, 'Intenta nuevamente.'),
+      );
+    } finally {
+      cambiarProcesando(false);
+    }
+  }
+
+  async function tomarEvidenciaParada(parada) {
+    try {
+      const permiso = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permiso.granted) {
+        cambiarError('Autoriza la cámara para registrar la evidencia de recolección.');
+        return;
+      }
+      const resultado = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.75,
+      });
+      if (resultado.canceled) return;
+      cambiarProcesando(true);
+      const recurso = resultado.assets[0];
+      const formulario = new FormData();
+      formulario.append(
+        'archivo',
+        recurso.file || {
+          uri: recurso.uri,
+          name: recurso.fileName || `parada-${parada.id}-${Date.now()}.jpg`,
+          type: recurso.mimeType || 'image/jpeg',
+        },
+      );
+      const respuesta = await conexionApi.post('/archivos/evidencias', formulario, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      cambiarEvidenciasParadas((actuales) => ({
+        ...actuales,
+        [parada.id]: {
+          url: respuesta.data.url,
+          nombre: recurso.fileName || 'Fotografía lista',
+        },
+      }));
+      cambiarError('');
+    } catch (excepcion) {
+      cambiarError(
+        obtenerMensajeErrorApi(excepcion, 'No fue posible subir la evidencia de la parada.'),
       );
     } finally {
       cambiarProcesando(false);
@@ -650,6 +710,13 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
                 {parada.direccion || 'Dirección no disponible'}
                 {parada.eta_minutos != null ? ` · ETA inicial ${parada.eta_minutos} min` : ''}
               </Text>
+              {parada.evidencia_url ? (
+                <Pressable onPress={() => Linking.openURL(parada.evidencia_url)}>
+                  <Text style={estilos.enlaceEvidencia}>Ver evidencia fotográfica</Text>
+                </Pressable>
+              ) : evidenciasParadas[parada.id] ? (
+                <Text style={estilos.evidenciaLista}>Fotografía lista para guardar</Text>
+              ) : null}
             </View>
             {parada.estado === 'pendiente' ? (
               <View style={estilos.accionesParada}>
@@ -659,6 +726,19 @@ export function PanelRecorrido({ rutas, alActualizarRutas }) {
                   style={estilos.accionAzul}
                 >
                   <Navigation color={colores.white} size={18} />
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Tomar evidencia de la parada ${parada.orden}`}
+                  disabled={procesando}
+                  onPress={() => tomarEvidenciaParada(parada)}
+                  style={estilos.accionFoto}
+                >
+                  {evidenciasParadas[parada.id] ? (
+                    <CheckCircle2 color={colores.white} size={18} />
+                  ) : (
+                    <Camera color={colores.white} size={18} />
+                  )}
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
@@ -905,8 +985,11 @@ const estilos = StyleSheet.create({
   codigo: { color: colores.text, fontSize: 13, fontWeight: '900' },
   estadoParada: { color: colores.muted, fontSize: 11 },
   direccion: { color: colores.muted, fontSize: 10, lineHeight: 14 },
+  evidenciaLista: { color: colores.primary, fontSize: 10, fontWeight: '900' },
+  enlaceEvidencia: { color: '#1769AA', fontSize: 10, fontWeight: '900' },
   accionesParada: { flexDirection: 'row', gap: 6 },
   accionAzul: { padding: 9, borderRadius: 10, backgroundColor: '#2196F3' },
+  accionFoto: { padding: 9, borderRadius: 10, backgroundColor: '#7B1FA2' },
   accionVerde: { padding: 9, borderRadius: 10, backgroundColor: colores.primary },
   accionNaranja: { padding: 9, borderRadius: 10, backgroundColor: colores.secondary },
   incidencia: {

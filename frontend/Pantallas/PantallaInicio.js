@@ -1,6 +1,8 @@
+import * as Location from 'expo-location';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -18,9 +20,14 @@ import {
   MapPinned,
   RefreshCw,
   Route,
+  Save,
+  Trash2,
 } from 'lucide-react-native';
 
+import { Boton } from '../componentes/Boton';
+import { CampoTexto } from '../componentes/CampoTexto';
 import { conexionApi, obtenerMensajeErrorApi } from '../componentes/conexionApi';
+import { usarSesion } from '../componentes/ContextoSesion';
 import { MapaRuta } from '../componentes/MapaRuta';
 import { PantallaBase } from '../componentes/PantallaBase';
 import {
@@ -62,23 +69,58 @@ const etiquetasOperacion = {
   cancelada: 'Ruta cancelada',
 };
 
-export function PantallaInicio() {
+export function PantallaInicio({ navigation }) {
+  const { usuario } = usarSesion();
+  const esAdmin = usuario?.rol === 'admin';
+  const esCiudadano = usuario?.rol === 'citizen';
   const [rutas, cambiarRutas] = useState([]);
   const [cargando, cambiarCargando] = useState(true);
   const [error, cambiarError] = useState('');
   const [diaSeleccionado, cambiarDiaSeleccionado] = useState(null);
   const [rutaSeleccionadaId, cambiarRutaSeleccionadaId] = useState(null);
+  const [ubicaciones, cambiarUbicaciones] = useState([]);
+  const [ubicacionSeleccionadaId, cambiarUbicacionSeleccionadaId] = useState(null);
+  const [nombreUbicacion, cambiarNombreUbicacion] = useState('');
+  const [guardandoUbicacion, cambiarGuardandoUbicacion] = useState(false);
   const estadosAnteriores = useRef(null);
+
+  const ubicacionSeleccionada = ubicaciones.find(
+    (ubicacion) => ubicacion.id === ubicacionSeleccionadaId,
+  ) || null;
 
   useEffect(() => {
     prepararNotificacionesLocales().catch(() => null);
   }, []);
 
+  const cargarUbicaciones = useCallback(async () => {
+    if (!esCiudadano) return [];
+    const respuesta = await conexionApi.get('/ubicaciones/mias');
+    cambiarUbicaciones(respuesta.data);
+    cambiarUbicacionSeleccionadaId((actual) => (
+      respuesta.data.some((ubicacion) => ubicacion.id === actual)
+        ? actual
+        : respuesta.data[0]?.id || null
+    ));
+    return respuesta.data;
+  }, [esCiudadano]);
+
   const cargarRutas = useCallback(async () => {
     try {
       cambiarCargando(true);
       cambiarError('');
-      const respuesta = await conexionApi.get('/rutas');
+      if (esCiudadano && !ubicacionSeleccionada) {
+        cambiarRutas([]);
+        return;
+      }
+      const respuesta = await conexionApi.get('/rutas', {
+        params: ubicacionSeleccionada
+          ? {
+              latitud: ubicacionSeleccionada.latitud,
+              longitud: ubicacionSeleccionada.longitud,
+              radio_m: ubicacionSeleccionada.radio_m,
+            }
+          : undefined,
+      });
       cambiarRutas(respuesta.data);
     } catch (excepcion) {
       cambiarError(
@@ -90,7 +132,13 @@ export function PantallaInicio() {
     } finally {
       cambiarCargando(false);
     }
-  }, []);
+  }, [esCiudadano, ubicacionSeleccionadaId]);
+
+  useEffect(() => {
+    cargarUbicaciones().catch((excepcion) => {
+      cambiarError(obtenerMensajeErrorApi(excepcion, 'No fue posible cargar tus zonas.'));
+    });
+  }, [cargarUbicaciones]);
 
   useFocusEffect(
     useCallback(() => {
@@ -138,6 +186,92 @@ export function PantallaInicio() {
   function cerrarDetalle() {
     cambiarDiaSeleccionado(null);
     cambiarRutaSeleccionadaId(null);
+  }
+
+  async function guardarUbicacionActual() {
+    try {
+      cambiarGuardandoUbicacion(true);
+      cambiarError('');
+      let permiso = await Location.getForegroundPermissionsAsync();
+      if (!permiso.granted && permiso.canAskAgain) {
+        permiso = await Location.requestForegroundPermissionsAsync();
+      }
+      if (!permiso.granted) {
+        throw new Error('Autoriza la ubicación para guardar esta zona.');
+      }
+      const posicion = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+      const direccion = await conexionApi.get('/geografia/direccion', {
+        params: {
+          latitud: posicion.coords.latitude,
+          longitud: posicion.coords.longitude,
+        },
+      });
+      const datosDireccion = direccion.data;
+      const respuesta = await conexionApi.post('/ubicaciones', {
+        nombre: nombreUbicacion.trim()
+          || datosDireccion.colonia
+          || datosDireccion.calle
+          || 'Mi zona',
+        direccion: datosDireccion.direccion_completa,
+        latitud: posicion.coords.latitude,
+        longitud: posicion.coords.longitude,
+        radio_m: 3000,
+      });
+      cambiarNombreUbicacion('');
+      await cargarUbicaciones();
+      cambiarUbicacionSeleccionadaId(respuesta.data.id);
+    } catch (excepcion) {
+      cambiarError(obtenerMensajeErrorApi(excepcion, excepcion.message || 'No se pudo guardar la zona.'));
+    } finally {
+      cambiarGuardandoUbicacion(false);
+    }
+  }
+
+  function confirmarEliminarUbicacion(ubicacion) {
+    Alert.alert(
+      'Quitar zona',
+      `¿Dejar de mostrar el calendario de ${ubicacion.nombre}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Quitar',
+          style: 'destructive',
+          onPress: async () => {
+            await conexionApi.delete(`/ubicaciones/${ubicacion.id}`);
+            await cargarUbicaciones();
+          },
+        },
+      ],
+    );
+  }
+
+  function editarRutaComoAdmin(ruta) {
+    cerrarDetalle();
+    navigation.navigate('Rutas', {
+      editarRutaId: ruta.id,
+      solicitudEdicion: Date.now(),
+    });
+  }
+
+  function confirmarEliminarRuta(ruta) {
+    Alert.alert(
+      'Eliminar del calendario',
+      `La ruta ${ruta.nombre} dejará de mostrarse. Podrás restaurarla desde Rutas.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            await conexionApi.patch(`/rutas/${ruta.id}`, { activa: false });
+            cerrarDetalle();
+            await cargarRutas();
+          },
+        },
+      ],
+    );
   }
 
   return (
@@ -189,10 +323,75 @@ export function PantallaInicio() {
           </Pressable>
         </View>
 
+        {esCiudadano ? (
+          <View style={estilos.selectorZona}>
+            <View style={estilos.tituloConIcono}>
+              <MapPin color={colores.primary} size={20} />
+              <Text style={estilos.zonaTitulo}>Zona del calendario</Text>
+            </View>
+            {ubicaciones.length > 0 ? (
+              <View style={estilos.zonasLista}>
+                {ubicaciones.map((ubicacion) => {
+                  const seleccionada = ubicacion.id === ubicacionSeleccionadaId;
+                  return (
+                    <View key={ubicacion.id} style={estilos.zonaFila}>
+                      <Pressable
+                        onPress={() => cambiarUbicacionSeleccionadaId(ubicacion.id)}
+                        style={[estilos.zonaChip, seleccionada && estilos.zonaChipActiva]}
+                      >
+                        <Text style={[estilos.zonaNombre, seleccionada && estilos.zonaTextoActivo]}>
+                          {ubicacion.nombre}
+                        </Text>
+                        <Text
+                          numberOfLines={1}
+                          style={[estilos.zonaDireccion, seleccionada && estilos.zonaTextoActivo]}
+                        >
+                          {ubicacion.direccion}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityLabel={`Quitar zona ${ubicacion.nombre}`}
+                        onPress={() => confirmarEliminarUbicacion(ubicacion)}
+                        style={estilos.botonQuitarZona}
+                      >
+                        <Trash2 color={colores.danger} size={18} />
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </View>
+            ) : (
+              <Text style={estilos.zonaVacia}>
+                Guarda una ubicación para ver únicamente las rutas cercanas a esa zona.
+              </Text>
+            )}
+            <CampoTexto
+              etiqueta="Nombre opcional"
+              placeholder="Casa, trabajo o colonia"
+              value={nombreUbicacion}
+              onChangeText={cambiarNombreUbicacion}
+              maxLength={80}
+            />
+            <Boton
+              texto="Guardar mi ubicación actual"
+              variante="secundario"
+              cargando={guardandoUbicacion}
+              alPresionar={guardarUbicacionActual}
+            />
+          </View>
+        ) : null}
+
         <Text style={estilos.leyenda}>
-          Los días verdes tienen una recolección programada.
+          {esCiudadano && ubicacionSeleccionada
+            ? `Solo se muestran rutas a ${Math.round(ubicacionSeleccionada.radio_m / 1000)} km de ${ubicacionSeleccionada.nombre}.`
+            : 'Los días verdes tienen una recolección programada.'}
         </Text>
         {error ? <Text style={estilos.error}>{error}</Text> : null}
+        {esCiudadano && ubicacionSeleccionada && !cargando && rutas.length === 0 ? (
+          <Text style={estilos.sinRutasCercanas}>
+            No tienes una ruta de recolección cercana registrada para esta zona.
+          </Text>
+        ) : null}
 
         <ScrollView
           horizontal
@@ -417,6 +616,24 @@ export function PantallaInicio() {
                       {ruta.descripcion ? (
                         <Text style={estilos.descripcionRuta}>{ruta.descripcion}</Text>
                       ) : null}
+                      {esAdmin ? (
+                        <View style={estilos.accionesAdminRuta}>
+                          <Pressable
+                            onPress={() => editarRutaComoAdmin(ruta)}
+                            style={estilos.botonAdminEditar}
+                          >
+                            <Save color={colores.white} size={17} />
+                            <Text style={estilos.textoBotonAdmin}>Editar y guardar</Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => confirmarEliminarRuta(ruta)}
+                            style={estilos.botonAdminEliminar}
+                          >
+                            <Trash2 color={colores.white} size={17} />
+                            <Text style={estilos.textoBotonAdmin}>Eliminar</Text>
+                          </Pressable>
+                        </View>
+                      ) : null}
                       </View>
                     );
                   })}
@@ -488,6 +705,47 @@ const estilos = StyleSheet.create({
     marginBottom: espaciado.md,
     color: colores.muted,
     fontSize: 13,
+  },
+  selectorZona: {
+    gap: espaciado.sm,
+    marginBottom: espaciado.md,
+    padding: espaciado.md,
+    borderWidth: 1,
+    borderColor: colores.border,
+    borderRadius: 15,
+    backgroundColor: colores.surface,
+  },
+  zonaTitulo: { color: colores.text, fontSize: 15, fontWeight: '900' },
+  zonasLista: { gap: espaciado.sm },
+  zonaFila: { flexDirection: 'row', alignItems: 'center', gap: espaciado.sm },
+  zonaChip: {
+    flex: 1,
+    padding: espaciado.sm,
+    borderWidth: 1,
+    borderColor: colores.border,
+    borderRadius: 12,
+    backgroundColor: colores.white,
+  },
+  zonaChipActiva: { borderColor: colores.primary, backgroundColor: colores.primary },
+  zonaNombre: { color: colores.text, fontSize: 13, fontWeight: '900' },
+  zonaDireccion: { color: colores.muted, fontSize: 11 },
+  zonaTextoActivo: { color: colores.white },
+  botonQuitarZona: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: '#FFF1F0',
+  },
+  zonaVacia: { color: colores.muted, fontSize: 12, lineHeight: 17 },
+  sinRutasCercanas: {
+    marginBottom: espaciado.md,
+    padding: espaciado.md,
+    color: colores.muted,
+    fontSize: 13,
+    borderRadius: 12,
+    backgroundColor: colores.surface,
   },
   botonActualizar: {
     width: 42,
@@ -617,6 +875,28 @@ const estilos = StyleSheet.create({
   tituloMapa: { color: colores.text, fontSize: 15, fontWeight: '900' },
   ayudaMapa: { color: colores.muted, fontSize: 12, lineHeight: 17 },
   descripcionRuta: { color: colores.muted, fontSize: 13, lineHeight: 18 },
+  accionesAdminRuta: { flexDirection: 'row', gap: espaciado.sm, marginTop: espaciado.sm },
+  botonAdminEditar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    padding: 11,
+    borderRadius: 11,
+    backgroundColor: colores.primary,
+  },
+  botonAdminEliminar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    padding: 11,
+    borderRadius: 11,
+    backgroundColor: colores.danger,
+  },
+  textoBotonAdmin: { color: colores.white, fontSize: 11, fontWeight: '900' },
   notaModal: {
     marginTop: espaciado.lg,
     marginBottom: espaciado.lg,

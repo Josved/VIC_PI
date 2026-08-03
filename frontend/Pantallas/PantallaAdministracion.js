@@ -107,7 +107,7 @@ export function PantallaAdministracion() {
         conexionApi.get('/administracion/usuarios'),
         conexionApi.get('/operacion/incidencias'),
         conexionApi.get('/administracion/vehiculos'),
-        conexionApi.get('/contenedores'),
+        conexionApi.get('/contenedores', { params: { incluir_inactivos: true } }),
         conexionApi.get('/administracion/recolectores'),
         conexionApi.get('/reportes'),
       ]);
@@ -407,7 +407,7 @@ export function PantallaAdministracion() {
       cambiarContenedorProcesando(true);
       cambiarError('');
       await conexionApi.delete(`/contenedores/${id}`);
-      cambiarExito('Contenedor eliminado.');
+      cambiarExito('Contenedor eliminado. Puedes restaurarlo desde esta lista.');
       cambiarContenedorSeleccionado(null);
       cambiarRegistrosContenedor([]);
       cancelarEdicionRegistro();
@@ -424,7 +424,7 @@ export function PantallaAdministracion() {
   function confirmarEliminacionContenedor(id) {
     Alert.alert(
       'Eliminar contenedor',
-      'Esta acción no se puede deshacer. Solo se permitirá si el contenedor no está relacionado con reportes o rutas.',
+      'Dejará de aparecer en mapas y nuevas rutas. Podrás restaurarlo después.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -434,6 +434,23 @@ export function PantallaAdministracion() {
         },
       ],
     );
+  }
+
+  async function restaurarContenedor(id) {
+    try {
+      cambiarContenedorProcesando(true);
+      cambiarError('');
+      const respuesta = await conexionApi.post(`/contenedores/${id}/restaurar`);
+      cambiarExito('Contenedor restaurado.');
+      await cargar();
+      seleccionarContenedor(respuesta.data);
+    } catch (excepcion) {
+      cambiarError(
+        obtenerMensajeErrorApi(excepcion, 'No se pudo restaurar el contenedor.'),
+      );
+    } finally {
+      cambiarContenedorProcesando(false);
+    }
   }
 
   async function crearContenedor() {
@@ -675,7 +692,12 @@ export function PantallaAdministracion() {
                     contenedorSeleccionado?.id === contenedor.id && estilos.textoChipActivo,
                   ]}
                 >
-                  {contenedor.codigo_qr}
+                  {contenedor.colonia
+                    || contenedor.calle
+                    || contenedor.direccion_completa
+                  || 'Zona sin identificar'}
+                  {' · '}{contenedor.codigo_qr}
+                  {!contenedor.activo ? ' · ELIMINADO' : ''}
                 </Text>
               </Pressable>
             ))}
@@ -802,16 +824,26 @@ export function PantallaAdministracion() {
               onChangeText={(valor) => cambiarContenedorFormulario((actual) => ({ ...actual, municipio: valor }))}
             />
             <View style={estilos.acciones}>
-              <Boton
-                texto="Guardar cambios"
-                cargando={contenedorProcesando}
-                alPresionar={actualizarContenedor}
-              />
-              <Boton
-                texto="Eliminar contenedor"
-                variante="fantasma"
-                alPresionar={() => confirmarEliminacionContenedor(contenedorSeleccionado.id)}
-              />
+              {contenedorSeleccionado.activo ? (
+                <>
+                  <Boton
+                    texto="Guardar cambios"
+                    cargando={contenedorProcesando}
+                    alPresionar={actualizarContenedor}
+                  />
+                  <Boton
+                    texto="Eliminar contenedor"
+                    variante="fantasma"
+                    alPresionar={() => confirmarEliminacionContenedor(contenedorSeleccionado.id)}
+                  />
+                </>
+              ) : (
+                <Boton
+                  texto="Restaurar contenedor"
+                  cargando={contenedorProcesando}
+                  alPresionar={() => restaurarContenedor(contenedorSeleccionado.id)}
+                />
+              )}
             </View>
             <Text style={estilos.subtitulo}>Historial de ubicaciones</Text>
             <View style={estilos.tarjetaContenedor}>

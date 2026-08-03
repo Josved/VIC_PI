@@ -63,7 +63,7 @@ def actualizar_estado_reporte(
     reporte_id: int,
     datos: ReporteActualizarEstado,
     base_datos: Session = Depends(obtener_base_datos),
-    _usuario_actual: Usuario = Depends(requiere_rol("collector", "admin")),
+    usuario_actual: Usuario = Depends(requiere_rol("collector", "admin")),
 ):
     reporte = base_datos.get(Reporte, reporte_id)
     if not reporte:
@@ -79,7 +79,26 @@ def actualizar_estado_reporte(
             detail="Escribe una respuesta para el ciudadano antes de resolver el reporte",
         )
 
+    if usuario_actual.rol == "collector" and reporte.usuario_id == usuario_actual.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No puedes tomar ni resolver un reporte creado por ti",
+        )
+
+    if (
+        usuario_actual.rol == "collector"
+        and reporte.atendido_por_id not in (None, usuario_actual.id)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Este reporte ya está siendo atendido por otro recolector",
+        )
+
     reporte.estado = datos.estado
+    if datos.estado == "pendiente" and usuario_actual.rol == "admin":
+        reporte.atendido_por_id = None
+    elif datos.estado in {"en_revision", "resuelto"}:
+        reporte.atendido_por_id = usuario_actual.id
     if respuesta:
         reporte.respuesta = respuesta
     base_datos.commit()

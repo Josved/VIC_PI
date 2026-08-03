@@ -32,6 +32,7 @@ class Contenedor(Base):
     longitud: Mapped[float] = mapped_column(Float, nullable=False)
     precision_m: Mapped[float | None] = mapped_column(Float, nullable=True)
     veces_registrado: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
     creado_por_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
     actualizado_por_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
     creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
@@ -71,6 +72,11 @@ class Reporte(Base):
     usuario_id: Mapped[int] = mapped_column(
         ForeignKey("usuarios.id"),
         nullable=False,
+        index=True,
+    )
+    atendido_por_id: Mapped[int | None] = mapped_column(
+        ForeignKey("usuarios.id"),
+        nullable=True,
         index=True,
     )
     motivo: Mapped[str] = mapped_column(String(40), nullable=False)
@@ -282,7 +288,32 @@ class ParadaEjecucionRuta(Base):
         index=True,
     )
     observacion: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    evidencia_url: Mapped[str | None] = mapped_column(String(300), nullable=True)
     atendido_en: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class UbicacionGuardadaUsuario(Base):
+    __tablename__ = "ubicaciones_guardadas_usuario"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    usuario_id: Mapped[int] = mapped_column(
+        ForeignKey("usuarios.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    nombre: Mapped[str] = mapped_column(String(80), nullable=False)
+    direccion: Mapped[str] = mapped_column(String(300), nullable=False)
+    latitud: Mapped[float] = mapped_column(Float, nullable=False)
+    longitud: Mapped[float] = mapped_column(Float, nullable=False)
+    radio_m: Mapped[float] = mapped_column(Float, nullable=False, default=3000)
+    activa: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
+    creado_en: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
+    actualizado_en: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=ahora_utc,
+        onupdate=ahora_utc,
+        nullable=False,
+    )
 
 
 class UbicacionEjecucionRuta(Base):

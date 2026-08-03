@@ -63,11 +63,16 @@ export function MapaContenedores({
               latitude: contenedor.latitud,
               longitude: contenedor.longitud,
             }}
-            title={`Contenedor ${contenedor.codigo_qr}`}
+            title={
+              contenedor.colonia
+              || contenedor.calle
+              || contenedor.direccion_completa
+              || 'Contenedor sin dirección'
+            }
             description={
               contenedor.distancia_m == null
-                ? 'Ubicación registrada'
-                : `${Math.round(contenedor.distancia_m)} m de distancia`
+                ? contenedor.codigo_qr
+                : `${contenedor.codigo_qr} · ${Math.round(contenedor.distancia_m)} m`
             }
             onPress={() => alSeleccionar(contenedor.id)}
           >

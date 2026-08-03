@@ -2,7 +2,6 @@ from math import asin, cos, radians, sin, sqrt
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .autenticacion import obtener_usuario_actual
@@ -67,6 +66,7 @@ def crear_respuesta(
         codigo_postal=detalle.codigo_postal if detalle else None,
         municipio=detalle.municipio if detalle else None,
         veces_registrado=contenedor.veces_registrado,
+        activo=contenedor.activo,
         creado_por_id=contenedor.creado_por_id,
         actualizado_por_id=contenedor.actualizado_por_id,
         creado_en=contenedor.creado_en,
@@ -99,6 +99,12 @@ def registrar_contenedor_por_qr(
         base_datos.add(contenedor)
         base_datos.flush()
     else:
+        if not contenedor.activo and usuario_actual.rol != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="El contenedor fue eliminado; un administrador debe restaurarlo",
+            )
+        contenedor.activo = True
         contenedor.latitud = datos.latitud
         contenedor.longitud = datos.longitud
         contenedor.precision_m = datos.precision_m
@@ -152,7 +158,9 @@ def obtener_contenedores_cercanos(
 ):
     resultados: list[tuple[float, Contenedor]] = []
 
-    for contenedor in base_datos.scalars(select(Contenedor)).all():
+    for contenedor in base_datos.scalars(
+        select(Contenedor).where(Contenedor.activo.is_(True)),
+    ).all():
         distancia = calcular_distancia_m(
             latitud,
             longitud,
@@ -172,11 +180,11 @@ def obtener_contenedores_cercanos(
 @enrutador.get("/{contenedor_id}", response_model=ContenedorRespuesta)
 def obtener_contenedor(
     contenedor_id: int,
-    _usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    usuario_actual: Usuario = Depends(obtener_usuario_actual),
     base_datos: Session = Depends(obtener_base_datos),
 ):
     contenedor = base_datos.get(Contenedor, contenedor_id)
-    if not contenedor:
+    if not contenedor or (not contenedor.activo and usuario_actual.rol != "admin"):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Contenedor no encontrado",
@@ -354,7 +362,7 @@ def actualizar_contenedor(
 @enrutador.delete("/{contenedor_id}")
 def eliminar_contenedor(
     contenedor_id: int,
-    _administrador: Usuario = Depends(requiere_rol("admin")),
+    administrador: Usuario = Depends(requiere_rol("admin")),
     base_datos: Session = Depends(obtener_base_datos),
 ):
     contenedor = base_datos.get(Contenedor, contenedor_id)
@@ -363,27 +371,43 @@ def eliminar_contenedor(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Contenedor no encontrado",
         )
-    base_datos.delete(contenedor)
-    try:
-        base_datos.commit()
-    except IntegrityError as error:
-        base_datos.rollback()
+    contenedor.activo = False
+    contenedor.actualizado_por_id = administrador.id
+    contenedor.actualizado_en = ahora_utc()
+    base_datos.commit()
+    return {"mensaje": "Contenedor eliminado; puede restaurarse desde administración"}
+
+
+@enrutador.post("/{contenedor_id}/restaurar", response_model=ContenedorRespuesta)
+def restaurar_contenedor(
+    contenedor_id: int,
+    administrador: Usuario = Depends(requiere_rol("admin")),
+    base_datos: Session = Depends(obtener_base_datos),
+):
+    contenedor = base_datos.get(Contenedor, contenedor_id)
+    if not contenedor:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "No se puede eliminar el contenedor porque está relacionado "
-                "con reportes, rutas u operaciones"
-            ),
-        ) from error
-    return {"mensaje": "Contenedor eliminado"}
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contenedor no encontrado",
+        )
+    contenedor.activo = True
+    contenedor.actualizado_por_id = administrador.id
+    contenedor.actualizado_en = ahora_utc()
+    base_datos.commit()
+    base_datos.refresh(contenedor)
+    return crear_respuesta(base_datos, contenedor)
 
 
 @enrutador.get("", response_model=list[ContenedorRespuesta])
 def listar_contenedores(
-    _usuario_actual: Usuario = Depends(obtener_usuario_actual),
+    incluir_inactivos: bool = Query(default=False),
+    usuario_actual: Usuario = Depends(obtener_usuario_actual),
     base_datos: Session = Depends(obtener_base_datos),
 ):
+    consulta = select(Contenedor)
+    if not (incluir_inactivos and usuario_actual.rol == "admin"):
+        consulta = consulta.where(Contenedor.activo.is_(True))
     contenedores = base_datos.scalars(
-        select(Contenedor).order_by(Contenedor.actualizado_en.desc()),
+        consulta.order_by(Contenedor.activo.desc(), Contenedor.actualizado_en.desc()),
     ).all()
     return [crear_respuesta(base_datos, contenedor) for contenedor in contenedores]

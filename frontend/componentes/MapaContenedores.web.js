@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { colores, espaciado } from './tema';
 
-export function MapaContenedores({ ubicacion, contenedores }) {
+export function MapaContenedores({ ubicacion, direccionUbicacion, contenedores }) {
   return (
     <View style={estilos.contenedor}>
       <MapPinned color={colores.primary} size={44} />
@@ -14,7 +14,7 @@ export function MapaContenedores({ ubicacion, contenedores }) {
       </Text>
       {ubicacion ? (
         <Text style={estilos.coordenadas}>
-          Tu ubicación: {ubicacion.latitude.toFixed(5)}, {ubicacion.longitude.toFixed(5)}
+          Tu ubicación: {direccionUbicacion || 'Identificando la dirección más próxima…'}
         </Text>
       ) : null}
       <Text style={estilos.resumen}>

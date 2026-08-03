@@ -1,7 +1,7 @@
 import json
 from math import ceil
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import case, delete, or_, select
 from sqlalchemy.orm import Session
 
@@ -54,7 +54,10 @@ def obtener_contenedores_validos(
     contenedor_ids: list[int],
 ) -> dict[int, Contenedor]:
     contenedores = base_datos.scalars(
-        select(Contenedor).where(Contenedor.id.in_(contenedor_ids)),
+        select(Contenedor).where(
+            Contenedor.id.in_(contenedor_ids),
+            Contenedor.activo.is_(True),
+        ),
     ).all()
     por_id = {contenedor.id: contenedor for contenedor in contenedores}
     faltantes = [
@@ -483,6 +486,26 @@ def consulta_ordenada():
     )
 
 
+def ruta_dentro_del_radio(
+    base_datos: Session,
+    ruta_id: int,
+    latitud: float,
+    longitud: float,
+    radio_m: float,
+) -> bool:
+    puntos = base_datos.scalars(
+        select(PuntoRuta).where(PuntoRuta.ruta_id == ruta_id),
+    ).all()
+    origen = {"latitud": latitud, "longitud": longitud}
+    return any(
+        distancia_metros(
+            origen,
+            {"latitud": punto.latitud, "longitud": punto.longitud},
+        ) <= radio_m
+        for punto in puntos
+    )
+
+
 def inicializar_rutas_sin_configuracion(base_datos: Session) -> int:
     rutas = base_datos.scalars(
         select(RutaRecoleccion).where(
@@ -514,12 +537,32 @@ def inicializar_rutas_sin_configuracion(base_datos: Session) -> int:
 
 @enrutador.get("", response_model=list[RutaRespuesta])
 def listar_rutas_activas(
+    latitud: float | None = Query(default=None, ge=-90, le=90),
+    longitud: float | None = Query(default=None, ge=-180, le=180),
+    radio_m: float = Query(default=3000, ge=250, le=20000),
     _usuario_actual: Usuario = Depends(obtener_usuario_actual),
     base_datos: Session = Depends(obtener_base_datos),
 ):
     rutas = base_datos.scalars(
         consulta_ordenada().where(RutaRecoleccion.activa.is_(True)),
     ).all()
+    if (latitud is None) != (longitud is None):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Envía latitud y longitud juntas para filtrar el calendario",
+        )
+    if latitud is not None and longitud is not None:
+        rutas = [
+            ruta
+            for ruta in rutas
+            if ruta_dentro_del_radio(
+                base_datos,
+                ruta.id,
+                latitud,
+                longitud,
+                radio_m,
+            )
+        ]
     return [crear_respuesta_ruta(base_datos, ruta) for ruta in rutas]
 
 

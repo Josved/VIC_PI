@@ -55,7 +55,7 @@ function textoDistancia(valor) {
   return valor >= 1000 ? `${(valor / 1000).toFixed(1)} km` : `${Math.round(valor)} m`;
 }
 
-export function PantallaRutas() {
+export function PantallaRutas({ route, navigation }) {
   const { usuario } = usarSesion();
   const esAdmin = usuario?.rol === 'admin';
   const { contenedores, cargando: cargandoContenedores } = usarContenedores();
@@ -76,6 +76,7 @@ export function PantallaRutas() {
   const [exito, cambiarExito] = useState('');
   const referenciaScroll = useRef(null);
   const posicionEditor = useRef(0);
+  const ultimaSolicitudEdicion = useRef(null);
 
   const contenedorIds = useMemo(
     () =>
@@ -111,6 +112,23 @@ export function PantallaRutas() {
   useEffect(() => {
     cargarRutas();
   }, [cargarRutas]);
+
+  useEffect(() => {
+    const solicitud = route?.params?.solicitudEdicion;
+    const rutaId = route?.params?.editarRutaId;
+    if (
+      !solicitud
+      || solicitud === ultimaSolicitudEdicion.current
+      || !rutaId
+      || rutas.length === 0
+    ) {
+      return;
+    }
+    const ruta = rutas.find((item) => item.id === rutaId);
+    ultimaSolicitudEdicion.current = solicitud;
+    if (ruta) editarRuta(ruta);
+    navigation.setParams({ editarRutaId: undefined, solicitudEdicion: undefined });
+  }, [navigation, route?.params?.editarRutaId, route?.params?.solicitudEdicion, rutas]);
 
   function limpiarFormulario() {
     cambiarFormulario(formularioInicial);
@@ -469,10 +487,17 @@ export function PantallaRutas() {
                       {seleccionado ? <Check color={colores.white} size={15} /> : null}
                     </View>
                     <View style={estilos.flexible}>
-                      <Text style={estilos.itemTitulo}>{contenedor.codigo_qr}</Text>
+                      <Text style={estilos.itemTitulo}>
+                        {contenedor.colonia
+                          || contenedor.calle
+                          || contenedor.direccion_completa
+                          || 'Zona sin identificar'}
+                      </Text>
                       <Text numberOfLines={1} style={estilos.itemDetalle}>
+                        {contenedor.codigo_qr}
                         {contenedor.direccion_completa
-                          || `${contenedor.latitud.toFixed(5)}, ${contenedor.longitud.toFixed(5)}`}
+                          ? ` · ${contenedor.direccion_completa}`
+                          : ''}
                       </Text>
                     </View>
                   </Pressable>
@@ -597,7 +622,9 @@ export function PantallaRutas() {
                   {nombresDia[ruta.dia_semana]} · {ruta.hora_aproximada} · {ruta.zona}
                 </Text>
               </View>
-              <Text style={estilos.estado}>{ruta.activa ? 'Activa' : 'Pausada'}</Text>
+              <Text style={estilos.estado}>
+                {ruta.activa ? 'Activa' : esAdmin ? 'Eliminada' : 'Pausada'}
+              </Text>
             </View>
             <Text style={estilos.rutaDato}>
               {textoDistancia(ruta.distancia_m)} · {ruta.duracion_minutos || 0} min ·{' '}
@@ -629,7 +656,13 @@ export function PantallaRutas() {
               >
                 <Power color={colores.secondary} size={17} />
                 <Text style={[estilos.botonSecundarioTexto, { color: colores.secondary }]}>
-                  {ruta.activa ? 'Pausar' : 'Activar'}
+                  {esAdmin
+                    ? ruta.activa
+                      ? 'Eliminar del calendario'
+                      : 'Restaurar'
+                    : ruta.activa
+                      ? 'Pausar'
+                      : 'Activar'}
                 </Text>
               </Pressable>
             </View>

@@ -44,6 +44,7 @@ function formatearDistancia(distanciaM) {
 export function PantallaContenedores() {
   const [estadoPermiso, cambiarEstadoPermiso] = useState('pendiente');
   const [ubicacion, cambiarUbicacion] = useState(null);
+  const [direccionActual, cambiarDireccionActual] = useState('');
   const [contenedores, cambiarContenedores] = useState([]);
   const [idSeleccionado, cambiarIdSeleccionado] = useState(null);
   const [radioM, cambiarRadioM] = useState(5000);
@@ -78,6 +79,17 @@ export function PantallaContenedores() {
       accuracy: Location.Accuracy.High,
     });
     cambiarUbicacion(posicion.coords);
+    try {
+      const respuestaDireccion = await conexionApi.get('/geografia/direccion', {
+        params: {
+          latitud: posicion.coords.latitude,
+          longitud: posicion.coords.longitude,
+        },
+      });
+      cambiarDireccionActual(respuestaDireccion.data.direccion_completa);
+    } catch {
+      cambiarDireccionActual('Dirección aproximada no disponible');
+    }
     return posicion.coords;
   }
 
@@ -309,7 +321,7 @@ export function PantallaContenedores() {
             </Text>
             <Text style={estilos.estadoDescripcion}>
               {ubicacion
-                ? `${ubicacion.latitude.toFixed(5)}, ${ubicacion.longitude.toFixed(5)} · precisión ${
+                ? `${direccionActual || 'Identificando tu dirección…'} · precisión ${
                     ubicacion.accuracy == null
                       ? 'desconocida'
                       : `${Math.round(ubicacion.accuracy)} m`
@@ -328,6 +340,7 @@ export function PantallaContenedores() {
 
         <MapaContenedores
           ubicacion={ubicacion}
+          direccionUbicacion={direccionActual}
           contenedores={contenedores}
           idSeleccionado={idSeleccionado}
           alSeleccionar={cambiarIdSeleccionado}
@@ -395,10 +408,13 @@ export function PantallaContenedores() {
                 </View>
                 <View style={estilos.info}>
                   <Text numberOfLines={1} style={estilos.codigo}>
-                    {contenedor.codigo_qr}
+                    {contenedor.colonia
+                      || contenedor.calle
+                      || contenedor.direccion_completa
+                      || 'Zona sin identificar'}
                   </Text>
-                  <Text style={estilos.detalle}>
-                    Actualizado {contenedor.veces_registrado}{' '}
+                  <Text numberOfLines={1} style={estilos.detalle}>
+                    {contenedor.codigo_qr} · actualizado {contenedor.veces_registrado}{' '}
                     {contenedor.veces_registrado === 1 ? 'vez' : 'veces'}
                   </Text>
                 </View>

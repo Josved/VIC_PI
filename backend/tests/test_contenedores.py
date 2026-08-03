@@ -575,6 +575,33 @@ class PruebasContenedores(unittest.TestCase):
             "El contenedor fue atendido y ya está disponible.",
         )
 
+        reporte_propio_recolector = self.cliente.post(
+            "/reportes",
+            headers=self.encabezados,
+            json={
+                "contenedor_id": contenedor_id,
+                "motivo": "sucio",
+                "comentario": "Reporte creado durante la inspección.",
+            },
+        )
+        self.assertEqual(reporte_propio_recolector.status_code, 201)
+        intento_tomar_propio = self.cliente.patch(
+            f"/reportes/{reporte_propio_recolector.json()['id']}/estado",
+            headers=self.encabezados,
+            json={"estado": "en_revision"},
+        )
+        self.assertEqual(intento_tomar_propio.status_code, 403)
+        tomado_por_admin = self.cliente.patch(
+            f"/reportes/{reporte_propio_recolector.json()['id']}/estado",
+            headers=self.encabezados_admin,
+            json={"estado": "en_revision"},
+        )
+        self.assertEqual(tomado_por_admin.status_code, 200)
+        self.assertEqual(
+            tomado_por_admin.json()["atendido_por_id"],
+            self.administrador_id,
+        )
+
         eliminacion_ciudadano = self.cliente.delete(
             f"/contenedores/{contenedor_id}",
             headers=self.encabezados_ciudadano,
@@ -585,7 +612,18 @@ class PruebasContenedores(unittest.TestCase):
             f"/contenedores/{contenedor_id}",
             headers=self.encabezados_admin,
         )
-        self.assertEqual(eliminacion_relacionado.status_code, 409, eliminacion_relacionado.text)
+        self.assertEqual(eliminacion_relacionado.status_code, 200, eliminacion_relacionado.text)
+        oculto_al_ciudadano = self.cliente.get(
+            f"/contenedores/{contenedor_id}",
+            headers=self.encabezados_ciudadano,
+        )
+        self.assertEqual(oculto_al_ciudadano.status_code, 404)
+        restaurado = self.cliente.post(
+            f"/contenedores/{contenedor_id}/restaurar",
+            headers=self.encabezados_admin,
+        )
+        self.assertEqual(restaurado.status_code, 200)
+        self.assertTrue(restaurado.json()["activo"])
 
     def test_rutas_semanales_y_permisos(self):
         contenedor = self.cliente.post(
@@ -632,6 +670,41 @@ class PruebasContenedores(unittest.TestCase):
         calendario = self.cliente.get("/rutas", headers=self.encabezados_ciudadano)
         self.assertEqual(calendario.status_code, 200, calendario.text)
         self.assertIn(ruta_id, [ruta["id"] for ruta in calendario.json()])
+
+        ubicacion_guardada = self.cliente.post(
+            "/ubicaciones",
+            headers=self.encabezados_ciudadano,
+            json={
+                "nombre": "Casa Centro",
+                "direccion": "Centro, Ciudad de México",
+                "latitud": 19.4326,
+                "longitud": -99.1332,
+                "radio_m": 3000,
+            },
+        )
+        self.assertEqual(ubicacion_guardada.status_code, 201, ubicacion_guardada.text)
+        calendario_cercano = self.cliente.get(
+            "/rutas",
+            headers=self.encabezados_ciudadano,
+            params={"latitud": 19.4326, "longitud": -99.1332, "radio_m": 3000},
+        )
+        self.assertIn(ruta_id, [item["id"] for item in calendario_cercano.json()])
+        calendario_lejano = self.cliente.get(
+            "/rutas",
+            headers=self.encabezados_ciudadano,
+            params={"latitud": 25.6866, "longitud": -100.3161, "radio_m": 1000},
+        )
+        self.assertNotIn(ruta_id, [item["id"] for item in calendario_lejano.json()])
+        eliminada = self.cliente.delete(
+            f"/ubicaciones/{ubicacion_guardada.json()['id']}",
+            headers=self.encabezados_ciudadano,
+        )
+        self.assertFalse(eliminada.json()["activa"])
+        restaurada = self.cliente.post(
+            f"/ubicaciones/{ubicacion_guardada.json()['id']}/restaurar",
+            headers=self.encabezados_ciudadano,
+        )
+        self.assertTrue(restaurada.json()["activa"])
 
         actualizacion = self.cliente.patch(
             f"/rutas/{ruta_id}",
@@ -1003,6 +1076,22 @@ class PruebasContenedores(unittest.TestCase):
         )
         self.assertEqual(evidencia.status_code, 200, evidencia.text)
         self.assertTrue(evidencia.json()["url"].startswith("/evidencias/"))
+        parada_id = inicio.json()["paradas"][0]["id"]
+        parada_con_evidencia = self.cliente.patch(
+            f"/operacion/ejecuciones/{inicio.json()['id']}/paradas/{parada_id}",
+            headers=self.encabezados,
+            json={
+                "estado": "recolectado",
+                "evidencia_url": evidencia.json()["url"],
+            },
+        )
+        self.assertEqual(parada_con_evidencia.status_code, 200)
+        parada_actualizada = next(
+            item
+            for item in parada_con_evidencia.json()["paradas"]
+            if item["id"] == parada_id
+        )
+        self.assertEqual(parada_actualizada["evidencia_url"], evidencia.json()["url"])
 
 
 if __name__ == "__main__":

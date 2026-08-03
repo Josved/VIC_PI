@@ -22,6 +22,7 @@ from .rutas import (
     inicializar_rutas_sin_configuracion,
 )
 from .operacion import enrutador as enrutador_operacion
+from .ubicaciones import enrutador as enrutador_ubicaciones
 
 Base.metadata.create_all(bind=motor_base_datos)
 migrar_esquema(motor_base_datos)
@@ -85,6 +86,7 @@ aplicacion.include_router(enrutador_administracion)
 aplicacion.include_router(enrutador_operacion)
 aplicacion.include_router(enrutador_geografia)
 aplicacion.include_router(enrutador_archivos)
+aplicacion.include_router(enrutador_ubicaciones)
 
 
 @aplicacion.get("/")

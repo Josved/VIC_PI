@@ -130,6 +130,7 @@ class ContenedorRespuesta(BaseModel):
     codigo_postal: str | None = None
     municipio: str | None = None
     veces_registrado: int
+    activo: bool = True
     creado_por_id: int
     actualizado_por_id: int
     creado_en: datetime
@@ -201,6 +202,7 @@ class ReporteRespuesta(BaseModel):
     id: int
     contenedor_id: int
     usuario_id: int
+    atendido_por_id: int | None = None
     motivo: MotivoReporte
     comentario: str | None
     evidencia_url: str | None
@@ -215,6 +217,48 @@ class ReporteRespuesta(BaseModel):
 class ReporteActualizarEstado(BaseModel):
     estado: EstadoReporte
     respuesta: str | None = Field(default=None, max_length=1000)
+
+
+class UbicacionGuardadaCrear(BaseModel):
+    nombre: str = Field(min_length=2, max_length=80)
+    direccion: str = Field(min_length=3, max_length=300)
+    latitud: float = Field(ge=-90, le=90)
+    longitud: float = Field(ge=-180, le=180)
+    radio_m: float = Field(default=3000, ge=250, le=20000)
+
+    @field_validator("nombre", "direccion")
+    @classmethod
+    def limpiar_ubicacion(cls, valor: str) -> str:
+        return " ".join(valor.strip().split())
+
+
+class UbicacionGuardadaActualizar(BaseModel):
+    nombre: str | None = Field(default=None, min_length=2, max_length=80)
+    direccion: str | None = Field(default=None, min_length=3, max_length=300)
+    latitud: float | None = Field(default=None, ge=-90, le=90)
+    longitud: float | None = Field(default=None, ge=-180, le=180)
+    radio_m: float | None = Field(default=None, ge=250, le=20000)
+    activa: bool | None = None
+
+    @field_validator("nombre", "direccion")
+    @classmethod
+    def limpiar_ubicacion_opcional(cls, valor: str | None) -> str | None:
+        return " ".join(valor.strip().split()) if valor else valor
+
+
+class UbicacionGuardadaRespuesta(BaseModel):
+    id: int
+    usuario_id: int
+    nombre: str
+    direccion: str
+    latitud: float
+    longitud: float
+    radio_m: float
+    activa: bool
+    creado_en: datetime
+    actualizado_en: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class CambiarContrasenaEntrada(BaseModel):
@@ -469,6 +513,7 @@ class UbicacionOperacionEntrada(BaseModel):
 class ParadaOperacionActualizar(BaseModel):
     estado: Literal["recolectado", "omitido", "incidencia"]
     observacion: str | None = Field(default=None, max_length=500)
+    evidencia_url: str | None = Field(default=None, max_length=300)
 
 
 class IncidenciaOperacionCrear(BaseModel):
@@ -491,6 +536,7 @@ class ParadaEjecucionRespuesta(BaseModel):
     orden: int
     estado: EstadoParada
     observacion: str | None
+    evidencia_url: str | None = None
     latitud: float
     longitud: float
     direccion: str | None = None

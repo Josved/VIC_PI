@@ -165,6 +165,7 @@ def crear_respuesta_ejecucion(
                 orden=parada.orden,
                 estado=parada.estado,
                 observacion=parada.observacion,
+                evidencia_url=parada.evidencia_url,
                 latitud=contenedor.latitud,
                 longitud=contenedor.longitud,
                 direccion=(
@@ -457,6 +458,8 @@ def actualizar_parada(
         )
     parada.estado = datos.estado
     parada.observacion = datos.observacion
+    if datos.evidencia_url is not None:
+        parada.evidencia_url = datos.evidencia_url
     parada.atendido_en = ahora_utc()
     ejecucion.actualizado_en = ahora_utc()
     base_datos.commit()

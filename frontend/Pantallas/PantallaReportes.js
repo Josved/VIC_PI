@@ -9,7 +9,10 @@ import {
 import {
   CircleCheck,
   ClipboardCheck,
+  Eye,
+  EyeOff,
   RefreshCw,
+  RotateCcw,
   Search,
   ShieldCheck,
 } from 'lucide-react-native';
@@ -75,6 +78,7 @@ export function PantallaReportes() {
   const [errorReportes, cambiarErrorReportes] = useState('');
   const [actualizandoId, cambiarActualizandoId] = useState(null);
   const [respuestas, cambiarRespuestas] = useState({});
+  const [reporteExpandidoId, cambiarReporteExpandidoId] = useState(null);
 
   const contenedoresFiltrados = useMemo(() => {
     const texto = busquedaCodigo.trim().toLowerCase();
@@ -178,6 +182,13 @@ export function PantallaReportes() {
     }
 
     const reporteActual = reportes.find((reporte) => reporte.id === reporteId);
+    if (
+      usuario?.rol === 'collector'
+      && reporteActual?.usuario_id === usuario.id
+    ) {
+      cambiarErrorReportes('No puedes tomar ni resolver un reporte creado por ti. Debe atenderlo otra persona.');
+      return;
+    }
     const respuesta =
       respuestas[reporteId]?.trim() || reporteActual?.respuesta?.trim() || '';
     if (estado === 'resuelto' && !respuesta) {
@@ -394,6 +405,15 @@ export function PantallaReportes() {
               const contenedor = contenedores.find(
                 (item) => item.id === reporte.contenedor_id,
               );
+              const expandido = reporteExpandidoId === reporte.id;
+              const reportePropio = reporte.usuario_id === usuario?.id;
+              const asignadoAOtraPersona = Boolean(
+                usuario?.rol === 'collector'
+                && reporte.atendido_por_id
+                && reporte.atendido_por_id !== usuario.id,
+              );
+              const puedeAtender = usuario?.rol === 'admin'
+                || (!reportePropio && !asignadoAOtraPersona);
               return (
                 <View key={reporte.id} style={estilos.tarjetaReporte}>
                   <View style={estilos.encabezadoReporte}>
@@ -429,68 +449,102 @@ export function PantallaReportes() {
                     </Text>
                   </View>
 
-                  <View style={estilos.detalleReporte}>
-                    <Text style={estilos.etiquetaDetalle}>
-                      {esGestor ? 'Comentario del ciudadano' : 'Lo que escribiste'}
-                    </Text>
-                    <Text style={estilos.comentarioReporte}>
-                      {reporte.comentario || 'Sin comentario adicional.'}
-                    </Text>
-                  </View>
+                  <Pressable
+                    onPress={() => cambiarReporteExpandidoId(expandido ? null : reporte.id)}
+                    style={estilos.botonVerMas}
+                  >
+                    {expandido ? (
+                      <EyeOff color={colores.primary} size={17} />
+                    ) : (
+                      <Eye color={colores.primary} size={17} />
+                    )}
+                    <Text style={estilos.textoVerMas}>{expandido ? 'Ocultar' : 'Ver más'}</Text>
+                  </Pressable>
 
-                  {!esGestor || reporte.respuesta ? (
-                    <View style={estilos.respuestaReporte}>
-                      <Text style={estilos.etiquetaRespuesta}>Respuesta del equipo</Text>
-                      <Text style={estilos.textoRespuesta}>
-                        {reporte.respuesta
-                          || (reporte.estado === 'pendiente'
-                            ? 'Tu reporte está pendiente de revisión.'
-                            : reporte.estado === 'en_revision'
-                              ? 'El equipo está revisando tu reporte y responderá aquí.'
-                              : 'Este reporte se marcó como resuelto antes de habilitar las respuestas.')}
-                      </Text>
-                    </View>
-                  ) : null}
-
-                  {esGestor && reporte.estado !== 'resuelto' ? (
-                    <View style={estilos.gestionReporte}>
-                      <CampoTexto
-                        etiqueta="Respuesta para el ciudadano"
-                        value={respuestas[reporte.id] ?? reporte.respuesta ?? ''}
-                        onChangeText={(valor) =>
-                          cambiarRespuestas((actuales) => ({
-                            ...actuales,
-                            [reporte.id]: valor,
-                          }))
-                        }
-                        placeholder="Explica qué se hizo o cómo se resolverá"
-                        maxLength={1000}
-                        multiline
-                      />
-                      <View style={estilos.accionesReporte}>
-                        {reporte.estado === 'pendiente' ? (
-                          <View style={estilos.accionReporte}>
-                            <Boton
-                              texto="Tomar"
-                              variante="secundario"
-                              cargando={actualizandoId === reporte.id}
-                              alPresionar={() =>
-                                actualizarEstado(reporte.id, 'en_revision')
-                              }
-                            />
-                          </View>
-                        ) : null}
-                        <View style={estilos.accionReporte}>
-                          <Boton
-                            texto="Responder y resolver"
-                            cargando={actualizandoId === reporte.id}
-                            alPresionar={() =>
-                              actualizarEstado(reporte.id, 'resuelto')
-                            }
-                          />
-                        </View>
+                  {expandido ? (
+                    <>
+                      <View style={estilos.detalleReporte}>
+                        <Text style={estilos.etiquetaDetalle}>
+                          {esGestor ? 'Comentario del ciudadano' : 'Lo que escribiste'}
+                        </Text>
+                        <Text style={estilos.comentarioReporte}>
+                          {reporte.comentario || 'Sin comentario adicional.'}
+                        </Text>
                       </View>
-                    </View>
+
+                      {!esGestor || reporte.respuesta ? (
+                        <View style={estilos.respuestaReporte}>
+                          <Text style={estilos.etiquetaRespuesta}>Respuesta del equipo</Text>
+                          <Text style={estilos.textoRespuesta}>
+                            {reporte.respuesta
+                              || (reporte.estado === 'pendiente'
+                                ? 'Tu reporte está pendiente de revisión.'
+                                : reporte.estado === 'en_revision'
+                                  ? 'El equipo está revisando tu reporte y responderá aquí.'
+                                  : 'El reporte fue resuelto.')}
+                          </Text>
+                        </View>
+                      ) : null}
+
+                      {esGestor && reportePropio && usuario?.rol === 'collector' ? (
+                        <Text style={estilos.avisoReportePropio}>
+                          Creaste este reporte. Debe tomarlo otro recolector o un administrador.
+                        </Text>
+                      ) : null}
+
+                      {asignadoAOtraPersona ? (
+                        <Text style={estilos.avisoReportePropio}>
+                          Este reporte ya está siendo atendido por otro recolector.
+                        </Text>
+                      ) : null}
+
+                      {esGestor && puedeAtender && reporte.estado !== 'resuelto' ? (
+                        <View style={estilos.gestionReporte}>
+                          <CampoTexto
+                            etiqueta="Respuesta para el ciudadano"
+                            value={respuestas[reporte.id] ?? reporte.respuesta ?? ''}
+                            onChangeText={(valor) =>
+                              cambiarRespuestas((actuales) => ({
+                                ...actuales,
+                                [reporte.id]: valor,
+                              }))
+                            }
+                            placeholder="Explica qué se hizo o cómo se resolverá"
+                            maxLength={1000}
+                            multiline
+                          />
+                          <View style={estilos.accionesReporte}>
+                            {reporte.estado === 'pendiente' ? (
+                              <View style={estilos.accionReporte}>
+                                <Boton
+                                  texto="Tomar"
+                                  variante="secundario"
+                                  cargando={actualizandoId === reporte.id}
+                                  alPresionar={() => actualizarEstado(reporte.id, 'en_revision')}
+                                />
+                              </View>
+                            ) : null}
+                            <View style={estilos.accionReporte}>
+                              <Boton
+                                texto="Responder y resolver"
+                                cargando={actualizandoId === reporte.id}
+                                alPresionar={() => actualizarEstado(reporte.id, 'resuelto')}
+                              />
+                            </View>
+                          </View>
+                        </View>
+                      ) : null}
+
+                      {usuario?.rol === 'admin' && reporte.estado === 'resuelto' ? (
+                        <Pressable
+                          onPress={() => actualizarEstado(reporte.id, 'pendiente')}
+                          style={estilos.botonReabrir}
+                        >
+                          <RotateCcw color={colores.primary} size={17} />
+                          <Text style={estilos.textoVerMas}>Reabrir reporte</Text>
+                        </Pressable>
+                      ) : null}
+                    </>
                   ) : null}
                 </View>
               );
@@ -708,6 +762,16 @@ const estilos = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
   },
+  botonVerMas: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderTopWidth: 1,
+    borderTopColor: colores.border,
+  },
+  textoVerMas: { color: colores.primary, fontSize: 12, fontWeight: '900' },
   comentarioReporte: {
     color: colores.text,
     fontSize: 13,
@@ -728,6 +792,14 @@ const estilos = StyleSheet.create({
   },
   etiquetaRespuesta: { color: colores.primary, fontSize: 12, fontWeight: '900' },
   textoRespuesta: { color: colores.text, fontSize: 13, lineHeight: 19 },
+  avisoReportePropio: {
+    padding: espaciado.md,
+    color: '#8A5800',
+    fontSize: 12,
+    lineHeight: 17,
+    borderRadius: 12,
+    backgroundColor: '#FFF3CD',
+  },
   gestionReporte: { gap: espaciado.sm },
   accionesReporte: {
     flexDirection: 'row',
@@ -735,5 +807,15 @@ const estilos = StyleSheet.create({
   },
   accionReporte: {
     flex: 1,
+  },
+  botonReabrir: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    padding: espaciado.sm,
+    borderWidth: 1,
+    borderColor: colores.primary,
+    borderRadius: 11,
   },
 });
