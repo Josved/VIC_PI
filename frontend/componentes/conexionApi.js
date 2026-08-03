@@ -35,7 +35,7 @@ export function obtenerMensajeErrorApi(error, mensajePorDefecto) {
   }
 
   if (!error?.response || error?.code === 'ERR_NETWORK') {
-    return 'No se pudo conectar con el servidor VIC. Revisa tu conexión Wi-Fi y confirma que el servidor esté encendido.';
+    return 'No se pudo conectar con el servidor VIC. Revisa tu conexión a Internet y confirma que el servidor esté encendido.';
   }
 
   if (error.response.status >= 500) {

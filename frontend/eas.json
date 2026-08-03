@@ -22,10 +22,6 @@
       "autoIncrement": true,
       "android": {
         "buildType": "apk"
-      },
-      "env": {
-        "EXPO_PUBLIC_API_URL": "http://192.168.100.18:18000",
-        "VIC_ALLOW_INSECURE_HTTP": "true"
       }
     },
     "production": {
