@@ -1,0 +1,226 @@
+PARA CHATGPT / CODEX - DESPLIEGUE AWS DEL PROYECTO VIC
+======================================================
+
+PROPÓSITO
+---------
+Este archivo contiene instrucciones obligatorias para cualquier asistente de IA
+que ayude a desplegar VIC en AWS. Debes leerlo completo antes de ejecutar comandos
+o proponer cambios.
+
+OBJETIVO DEL PROYECTO
+---------------------
+VIC debe simular una arquitectura con dos servidores:
+
+1. Servidor público:
+   - Nginx.
+   - Aplicación web.
+   - HTTPS.
+   - Balanceo de carga hacia dos réplicas de la API.
+   - Node Exporter.
+
+2. Servidor privado:
+   - Dos réplicas del backend/API.
+   - Base de datos de demostración.
+   - Prometheus.
+   - Grafana.
+   - Node Exporter y cAdvisor.
+
+La arquitectura funcional actual se ejecuta en VirtualBox. Cloudflare Tunnel
+publica temporalmente la web y la API sin exponer directamente la base de datos.
+
+ESTADO ACTUAL DE AWS
+--------------------
+- La cuenta AWS revisada indicó que NO cumple los requisitos del plan gratuito.
+- AWS ofreció cambiarla a un plan de pago.
+- Por esa razón, NO está autorizado crear recursos reales en esa cuenta.
+- La carpeta infra/aws prepara y valida una simulación, pero no despliega nada.
+- Tener una plantilla de CloudFormation válida NO significa que ejecutarla sea gratis.
+- La aplicación y la API públicas mediante Cloudflare Tunnel no equivalen a tener
+  las máquinas alojadas completamente en AWS.
+
+REGLAS OBLIGATORIAS DE SEGURIDAD Y COSTO
+----------------------------------------
+1. NO aceptar ni activar un plan de pago.
+2. NO registrar una tarjeta, modificar facturación ni contratar soporte.
+3. NO ejecutar "aws cloudformation deploy", "create-stack" ni comandos equivalentes.
+4. NO crear EC2, RDS, NAT Gateway, Elastic IP, Load Balancer, Route 53, CloudFront,
+   bases de datos administradas ni cualquier otro recurso con costo.
+5. NO asumir que un servicio es gratis. Verificarlo en la documentación oficial de
+   AWS y en la sección de créditos y nivel gratuito de ESA cuenta.
+6. NO crear recursos solo para probar que la plantilla funciona.
+7. NO solicitar, mostrar, copiar ni guardar contraseñas, códigos MFA, claves privadas,
+   claves SMTP, tokens, Access Key ID o Secret Access Key en el chat o en Git.
+8. NO usar la cuenta raíz para tareas diarias. La cuenta raíz solo debe usarse para
+   acciones que AWS reserve expresamente para ella y debe tener MFA.
+9. NO abrir SSH, la API, Grafana, Prometheus o la base de datos a 0.0.0.0/0.
+10. NO cambiar AdminCidr a 0.0.0.0/0. Debe ser la IP pública real del administrador
+    seguida de /32.
+11. NO comprar ni registrar un dominio. Para la demostración actual se usa una URL
+    temporal de TryCloudflare. Un dominio permanente requiere autorización aparte.
+12. NO afirmar que el criterio de nube está completo mientras el origen siga siendo
+    VirtualBox local.
+
+ARCHIVOS QUE DEBES LEER ANTES DE PROPONER CAMBIOS
+-------------------------------------------------
+1. infra/aws/README.md
+2. infra/aws/cloudformation-vic.yaml
+3. infra/aws/validar-simulacion.ps1
+4. infra/aws/configurar-publico-aws.sh
+5. infra/aws/configurar-privado-aws.sh
+6. infra/servidor-publico/compose.yaml
+7. infra/servidor-privado/compose.yaml
+8. infra/servidor-publico/nginx.conf
+9. infra/cloudflare/README.md
+10. infra/cloudflare/REINICIO.md
+
+MODO SEGURO AUTORIZADO AHORA
+----------------------------
+Solo está autorizado inspeccionar archivos, mejorar documentación y realizar
+validaciones que no creen recursos.
+
+Desde PowerShell:
+
+cd "C:\PROGRAMACION\PI\PROYECTO INTEGRADOR"
+powershell -ExecutionPolicy Bypass -File .\infra\aws\validar-simulacion.ps1
+
+El resultado correcto debe indicar que no se ejecutó un despliegue de
+CloudFormation. Si cfn-lint está disponible, también puede validar el esquema
+localmente.
+
+También se permite esta validación de sintaxis si AWS CLI ya está configurada y el
+usuario entiende que solo consulta AWS, sin crear recursos:
+
+aws cloudformation validate-template --template-body file://infra/aws/cloudformation-vic.yaml
+
+Antes de ejecutarla, confirma la cuenta y la región con operaciones de solo lectura:
+
+aws sts get-caller-identity
+aws configure get region
+
+Nunca imprimas las credenciales de AWS. "get-caller-identity" muestra la identidad
+de la cuenta, no las claves secretas.
+
+CONDICIONES PARA CONSIDERAR UN DESPLIEGUE REAL
+----------------------------------------------
+No continúes hasta que TODAS las condiciones siguientes sean verdaderas:
+
+[ ] El usuario tiene una cuenta elegible o créditos AWS visibles y vigentes.
+[ ] El usuario verificó en Billing and Cost Management el saldo y la fecha de
+    vencimiento de los créditos.
+[ ] El usuario configuró MFA en la cuenta raíz.
+[ ] El usuario configuró alertas de facturación y un presupuesto con avisos bajos.
+[ ] El usuario verificó la región, los precios actuales y la elegibilidad exacta de
+    t3.micro o t2.micro.
+[ ] El usuario revisó el costo de dos instancias, dos direcciones IPv4 públicas y
+    discos EBS gp3 cifrados.
+[ ] Existe una llave EC2 y su clave privada no está guardada en el repositorio.
+[ ] Se conoce la IP pública del administrador en formato x.x.x.x/32.
+[ ] El asistente presentó antes un resumen de recursos y una estimación de costo.
+[ ] El usuario escribió una autorización expresa para crear recursos reales y
+    aceptar el riesgo de cargos.
+
+Si falta una sola condición, detente y usa únicamente la simulación de VirtualBox.
+
+ARQUITECTURA AWS PREPARADA
+--------------------------
+La plantilla infra/aws/cloudformation-vic.yaml incluye:
+
+- Una VPC 10.30.0.0/16.
+- Una subred 10.30.1.0/24.
+- Un Internet Gateway y una tabla de rutas.
+- Grupo de seguridad público para SSH administrativo, HTTP y HTTPS.
+- Grupo de seguridad privado que solo recibe tráfico desde el servidor público.
+- EC2 vic-publico con IP privada 10.30.1.10.
+- EC2 vic-privado con IP privada 10.30.1.20.
+- Volúmenes EBS gp3 cifrados y eliminables junto con las instancias.
+- Nginx como balanceador, evitando un balanceador administrado de AWS.
+- Sin RDS, NAT Gateway, Elastic IP ni Load Balancer de AWS.
+
+IMPORTANTE: ambas instancias reciben una IPv4 pública temporal para poder instalar
+dependencias sin usar NAT Gateway. La instancia privada no acepta entradas directas
+desde Internet, pero las IPv4 públicas y los demás recursos pueden generar cargos.
+
+PROCEDIMIENTO SI EN EL FUTURO SE AUTORIZA AWS
+---------------------------------------------
+1. Actualizar la rama main y confirmar el commit que se desplegará.
+2. Revisar que no existan secretos ni archivos .env dentro de Git.
+3. Ejecutar infra/aws/validar-simulacion.ps1.
+4. Validar la plantilla con cfn-lint y validate-template.
+5. Mostrar al usuario la cuenta, región, parámetros y recursos que se crearían.
+6. Confirmar el tipo de instancia elegible en esa cuenta y región.
+7. Obtener la IP pública del administrador y usar únicamente IP/32.
+8. Pedir la autorización final justo antes de crear la pila.
+9. Crear una sola pila con un nombre identificable, por ejemplo vic-laboratorio.
+10. Esperar a que CloudFormation termine y revisar eventos antes de hacer cambios
+    manuales.
+11. Probar en este orden:
+    - Estado de ambas instancias.
+    - HTTPS del servidor público.
+    - /salud-publica.
+    - /api/salud.
+    - Inicio de sesión y permisos por rol.
+    - Balanceo entre las dos API.
+    - Grafana a través de /grafana/.
+    - Prometheus y sus objetivos.
+    - UFW y Security Groups.
+12. Actualizar EXPO_PUBLIC_API_URL con la URL pública terminada en /api antes de
+    generar otro APK.
+13. Guardar capturas de la demostración, sin mostrar secretos.
+14. Eliminar la pila inmediatamente al terminar la práctica, si así se acordó.
+15. Esperar a que la eliminación termine y revisar que no queden instancias,
+    volúmenes, interfaces de red u otros recursos creados para la práctica.
+16. Revisar Billing and Cost Management después de eliminarla.
+
+BORRADO SEGURO DESPUÉS DE UNA PRÁCTICA AUTORIZADA
+-------------------------------------------------
+Antes de eliminar, muestra las pilas y confirma el nombre exacto. Nunca uses un nombre
+adivinado ni borres recursos ajenos al proyecto.
+
+aws cloudformation describe-stacks --stack-name vic-laboratorio
+aws cloudformation delete-stack --stack-name vic-laboratorio
+aws cloudformation wait stack-delete-complete --stack-name vic-laboratorio
+
+Estos comandos solo deben usarse si la pila vic-laboratorio realmente fue creada para
+VIC y el usuario autorizó retirarla.
+
+CRITERIOS PARA DAR EL TRABAJO POR TERMINADO
+-------------------------------------------
+- Web y API accesibles desde una red externa.
+- HTTPS funcional y documentado.
+- Dos réplicas del backend visibles y balanceadas.
+- Servidor privado sin puertos sensibles abiertos a Internet.
+- Prometheus con todos los objetivos esperados en estado UP.
+- Grafana mostrando aplicación, servidores, contenedores y firewall.
+- Aplicación Android conectada a la misma API y base de datos que la web.
+- Alertas de facturación activas.
+- Evidencias sin contraseñas, tokens ni claves.
+- Plan de apagado o eliminación ejecutado y verificado.
+
+RESPUESTA QUE DEBE DAR EL ASISTENTE ANTES DE CUALQUIER DESPLIEGUE
+---------------------------------------------------------------
+El asistente debe informar, de forma breve:
+
+1. Qué cuenta y región se usarían.
+2. Qué recursos se crearían.
+3. Qué elementos pueden producir cargos.
+4. Qué validaciones gratuitas ya se completaron.
+5. Qué información o autorización falta.
+6. Cómo se eliminarán todos los recursos al finalizar.
+
+Si el usuario solo dice "hazlo", "continúa" o "ya di permiso", eso no sustituye la
+confirmación específica para crear recursos de AWS con posible costo. Debe quedar claro
+que autoriza el despliegue real y el riesgo de cargos después de ver el resumen.
+
+ALTERNATIVA SIN GASTO REAL
+--------------------------
+Mientras AWS no esté autorizado, conserva esta solución:
+
+- Dos servidores Ubuntu en VirtualBox.
+- Docker Compose en ambos servidores.
+- Nginx, HTTPS, balanceo, API, base de datos, Prometheus y Grafana.
+- Cloudflare Tunnel temporal para abrir la web y la API desde cualquier Wi-Fi.
+- EAS Build para distribuir el APK ya generado.
+
+Esta alternativa permite demostrar casi toda la infraestructura sin crear recursos de
+AWS. Debe documentarse como laboratorio local publicado por túnel, no como despliegue
+completo en la nube.
