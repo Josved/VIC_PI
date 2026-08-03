@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 19.1.0"
+    "version": ">= 19.1.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -11,21 +12,25 @@
         "buildType": "apk"
       },
       "env": {
+        "EXPO_PUBLIC_API_URL": "http://192.168.100.18:18000",
         "VIC_ALLOW_INSECURE_HTTP": "true"
       }
     },
     "preview": {
       "distribution": "internal",
       "environment": "preview",
+      "autoIncrement": true,
       "android": {
         "buildType": "apk"
       },
       "env": {
+        "EXPO_PUBLIC_API_URL": "http://192.168.100.18:18000",
         "VIC_ALLOW_INSECURE_HTTP": "true"
       }
     },
     "production": {
       "environment": "production",
+      "autoIncrement": true,
       "env": {
         "VIC_ALLOW_INSECURE_HTTP": "false"
       }

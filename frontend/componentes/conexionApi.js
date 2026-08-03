@@ -30,5 +30,17 @@ export function obtenerMensajeErrorApi(error, mensajePorDefecto) {
     return detalle[0].msg;
   }
 
+  if (error?.code === 'ECONNABORTED') {
+    return 'El servidor tardó demasiado en responder. Revisa tu conexión e inténtalo nuevamente.';
+  }
+
+  if (!error?.response || error?.code === 'ERR_NETWORK') {
+    return 'No se pudo conectar con el servidor VIC. Revisa tu conexión Wi-Fi y confirma que el servidor esté encendido.';
+  }
+
+  if (error.response.status >= 500) {
+    return 'El servidor VIC presentó un problema. Espera un momento e inténtalo nuevamente.';
+  }
+
   return mensajePorDefecto;
 }

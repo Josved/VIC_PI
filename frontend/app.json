@@ -13,7 +13,10 @@
     },
     "ios": {
       "bundleIdentifier": "com.josved.vic",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.josved.vic",
@@ -26,6 +29,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0e33eee3-dc5c-4099-ac64-dcec54735efa"
+      }
+    },
+    "owner": "vicexpo12345s-team"
   }
 }

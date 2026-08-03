@@ -11,6 +11,7 @@ import { colores, espaciado } from '../componentes/tema';
 const LARGO_MAXIMO_NOMBRE = 50;
 const PATRON_NOMBRE =
   /^[A-Za-zÁÉÍÓÚÑÜáéíóúñü]+(?:[ '-][A-Za-zÁÉÍÓÚÑÜáéíóúñü]+)*$/;
+const PATRON_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function validarNombre(valor) {
   const texto = valor.trim();
@@ -32,14 +33,18 @@ export function PantallaRegistro({ navigation }) {
   }
 
   async function crearCuenta() {
-    if (!validarNombre(formulario.nombre) || !validarNombre(formulario.apellidos)) {
+    const nombre = formulario.nombre.trim();
+    const apellidos = formulario.apellidos.trim();
+    const correo = formulario.correo.trim().toLowerCase();
+
+    if (!validarNombre(nombre) || !validarNombre(apellidos)) {
       setErrorFormulario(
         'Nombre y apellidos solo admiten letras, espacios, guion y apóstrofo.',
       );
       return;
     }
-    if (!formulario.correo) {
-      setErrorFormulario('Escribe tu correo.');
+    if (!PATRON_CORREO.test(correo)) {
+      setErrorFormulario('Escribe un correo válido, por ejemplo: nombre@correo.com.');
       return;
     }
     if (formulario.contrasena.length < 8 || formulario.contrasena.length > 72) {
@@ -51,13 +56,13 @@ export function PantallaRegistro({ navigation }) {
       setErrorFormulario('');
       setCargando(true);
       await registrarCuenta({
-        nombre: formulario.nombre,
-        apellidos: formulario.apellidos,
-        correo: formulario.correo,
+        nombre,
+        apellidos,
+        correo,
         contrasena: formulario.contrasena,
       });
       navigation.replace('VerificarCorreo', {
-        correo: formulario.correo.trim().toLowerCase(),
+        correo,
       });
     } catch (error) {
       setErrorFormulario(obtenerMensajeErrorApi(error, 'No se pudo crear la cuenta.'));
