@@ -4,7 +4,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { Home, MapPinned, QrCode, Route, ShieldCheck, UserRound } from 'lucide-react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Platform } from 'react-native';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProveedorSesion, usarSesion } from './componentes/ContextoSesion';
 import { ProveedorTutorial } from './componentes/ContextoTutorial';
@@ -39,8 +40,11 @@ function NavegadorSesion() {
 
 function NavegadorPrincipal() {
   const { usuario } = usarSesion();
+  const areaSegura = useSafeAreaInsets();
   const puedeGestionarRutas =
     usuario?.rol === 'collector' || usuario?.rol === 'admin';
+  const espacioInferiorMenu =
+    Platform.OS === 'web' ? 8 : Math.max(areaSegura.bottom, 12);
 
   return (
     <PestanasPrincipales.Navigator
@@ -50,9 +54,9 @@ function NavegadorPrincipal() {
         tabBarInactiveTintColor: colores.muted,
         tabBarStyle: {
           borderTopColor: colores.border,
-          minHeight: 64,
+          height: 56 + espacioInferiorMenu,
           paddingTop: 8,
-          paddingBottom: 8,
+          paddingBottom: espacioInferiorMenu,
         },
       }}
     >
