@@ -6,6 +6,8 @@ import { Home, MapPinned, QrCode, Route, ShieldCheck, UserRound } from 'lucide-r
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ProveedorSesion, usarSesion } from './componentes/ContextoSesion';
+import { ProveedorTutorial } from './componentes/ContextoTutorial';
+import { TutorialInicial } from './componentes/TutorialInicial';
 import { colores } from './componentes/tema';
 import { PantallaContenedores } from './Pantallas/PantallaContenedores';
 import { PantallaAdministracion } from './Pantallas/PantallaAdministracion';
@@ -110,8 +112,11 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ProveedorSesion>
-        <NavegadorRaiz />
-        <StatusBar style="dark" />
+        <ProveedorTutorial>
+          <NavegadorRaiz />
+          <TutorialInicial />
+          <StatusBar style="dark" />
+        </ProveedorTutorial>
       </ProveedorSesion>
     </SafeAreaProvider>
   );

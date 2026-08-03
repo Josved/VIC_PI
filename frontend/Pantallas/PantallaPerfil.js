@@ -6,6 +6,7 @@ import { CampoTexto } from '../componentes/CampoTexto';
 import { conexionApi, obtenerMensajeErrorApi } from '../componentes/conexionApi';
 import { PantallaBase } from '../componentes/PantallaBase';
 import { usarSesion } from '../componentes/ContextoSesion';
+import { usarTutorial } from '../componentes/ContextoTutorial';
 import { colores, espaciado } from '../componentes/tema';
 
 const perfiles = {
@@ -28,6 +29,7 @@ const perfiles = {
 
 export function PantallaPerfil({ navigation }) {
   const { cerrarSesion, refrescarUsuario, usuario } = usarSesion();
+  const { abrirTutorial } = usarTutorial();
   const perfil = perfiles[usuario?.rol] || perfiles.citizen;
   const puedeGestionarRutas =
     usuario?.rol === 'collector' || usuario?.rol === 'admin';
@@ -87,6 +89,13 @@ export function PantallaPerfil({ navigation }) {
           />
         </View>
       ) : null}
+      <View style={estilos.accion}>
+        <Boton
+          texto={`Ver tutorial de ${perfil.etiqueta.toLowerCase()}`}
+          variante="secundario"
+          alPresionar={abrirTutorial}
+        />
+      </View>
       <View style={estilos.seguridad}>
         <Text style={estilos.tituloSeguridad}>Cambiar contraseña</Text>
         <CampoTexto
