@@ -1,3 +1,4 @@
+import { useCallback, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -8,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ProveedorSesion, usarSesion } from './componentes/ContextoSesion';
 import { ProveedorTutorial } from './componentes/ContextoTutorial';
 import { TutorialInicial } from './componentes/TutorialInicial';
+import { PantallaBienvenida } from './componentes/PantallaBienvenida';
 import { colores } from './componentes/tema';
 import { PantallaContenedores } from './Pantallas/PantallaContenedores';
 import { PantallaAdministracion } from './Pantallas/PantallaAdministracion';
@@ -109,6 +111,9 @@ function NavegadorRaiz() {
 }
 
 export default function App() {
+  const [mostrarBienvenida, setMostrarBienvenida] = useState(true);
+  const finalizarBienvenida = useCallback(() => setMostrarBienvenida(false), []);
+
   return (
     <SafeAreaProvider>
       <ProveedorSesion>
@@ -116,6 +121,9 @@ export default function App() {
           <NavegadorRaiz />
           <TutorialInicial />
           <StatusBar style="dark" />
+          {mostrarBienvenida ? (
+            <PantallaBienvenida onFinalizar={finalizarBienvenida} />
+          ) : null}
         </ProveedorTutorial>
       </ProveedorSesion>
     </SafeAreaProvider>

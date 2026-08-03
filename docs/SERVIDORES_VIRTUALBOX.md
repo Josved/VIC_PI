@@ -16,6 +16,19 @@ El certificado del laboratorio es autofirmado, por lo que el navegador puede
 mostrar una advertencia. La IP de la LAN puede cambiar al conectarse a otra red;
 se obtiene con `ipconfig` buscando la dirección IPv4 del adaptador Wi-Fi.
 
+Grafana también queda disponible a través de la URL activa de Cloudflare
+agregando `/grafana/`. Sus paneles muestran las dos réplicas de la API, ambos
+servidores, los contenedores Docker y el estado de Prometheus. Las credenciales
+se conservan únicamente en `C:\PROGRAMACION\VIRTUALIZACION\vic-servidores\CREDENCIALES-LOCALES.txt`.
+
+Prometheus no se publica directamente en Internet. Para revisar sus objetivos
+desde la laptop se puede crear un túnel SSH y abrir
+`http://127.0.0.1:19090/targets`:
+
+```powershell
+ssh -N -L 19090:127.0.0.1:9090 -i "C:\Users\Josve\.ssh\vic_servers_ed25519" -p 2223 vicadmin@127.0.0.1
+```
+
 ## Encender
 
 Primero se inicia el servidor privado y después el público:

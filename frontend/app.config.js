@@ -16,6 +16,10 @@ module.exports = ({ config }) => ({
   },
   android: {
     ...config.android,
+    blockedPermissions: [
+      ...(config.android?.blockedPermissions || []),
+      'android.permission.RECORD_AUDIO',
+    ],
     ...(googleServicesFile ? { googleServicesFile } : {}),
     ...(claveAndroid
       ? {
@@ -51,6 +55,14 @@ module.exports = ({ config }) => ({
   },
   plugins: [
     'expo-dev-client',
+    [
+      'expo-audio',
+      {
+        microphonePermission: false,
+        recordAudioAndroid: false,
+      },
+    ],
+    'expo-asset',
     'expo-secure-store',
     '@react-native-community/datetimepicker',
     [
