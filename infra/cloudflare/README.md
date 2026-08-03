@@ -36,3 +36,6 @@ cd "C:\PROGRAMACION\PI\PROYECTO INTEGRADOR"
   URL nueva seguida de `/api`.
 - TryCloudflare es apropiado para demostraciones y pruebas, no garantiza
   disponibilidad de producción.
+
+El procedimiento completo que debe seguirse después de reiniciar la laptop o
+cambiar de Wi-Fi está guardado en [REINICIO.md](REINICIO.md).
